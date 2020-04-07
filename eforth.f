@@ -2,78 +2,81 @@
 
 ( Kernel ===================================================== )
 
+$80 CONSTANT IMEDD      ( IMMEDIATE flag)
+$40 CONSTANT COMPO      ( COMPILE-ONLY flag)
+
 $80 CONSTANT HLD
 $84 CONSTANT SPAN
 $88 CONSTANT >IN
 $8C CONSTANT #TIB
-$90 CONSTANT 'TIB       ( $100 )
-$94 CONSTANT BASE       (  $10 )
-$98 CONSTANT CONTEXT
-$9C CONSTANT CP
-$A0 CONSTANT LAST
-$A4 CONSTANT 'EVAL
-$A8 CONSTANT 'ABORT
-$AC CONSTANT tmp
+$90 CONSTANT 'TIB       ( $100)
+$94 CONSTANT BASE       (  $10)
+$98 CONSTANT CONTEXT    ( nfa of IMMEDIATE)
+$9C CONSTANT CP         ( 1st free entry in data[])
+$A0 CONSTANT LAST       ( nfa of IMMEDIATE)
+$A4 CONSTANT 'EVAL      ( cfa of $INTERPRET)
+$A8 CONSTANT 'ABORT     ( cfa of ABORT")
+$AC CONSTANT tmp        ( 0)
 
-CODE NOP          END-CODE
-CODE BYE   bye,   END-CODE
-CODE ?RX   qrx,   END-CODE
-CODE TX!   txsto, END-CODE
+CODE NOP   END-CODE
+CODE BYE   bye, END-CODE
+CODE ?RX ( - c t|0)   qrx, END-CODE
+CODE TX! ( c)   txsto, END-CODE
 CODE DOCON ( - n)   docon, END-CODE
 CODE DOLIT ( - n)   dolit, END-CODE
 CODE DOLIST dolist, END-CODE
 CODE EXIT   exitt, END-CODE
 CODE EXECUTE ( a)   execu, END-CODE
 CODE DONEXT  donext, END-CODE
-CODE QBRANCH ( f)   qbran,
-CODE BRANCH  bran,
-CODE ! ( n a)   store,
-CODE @ ( a - n)   at,
-CODE C! ( c a)   cstor,
-CODE C@ ( a - c)   cat,
-CODE R> ( -n)   rfrom,
-CODE R@ ( -n)   rat,
-CODE >R ( n)   tor,
-CODE DROP ( n)   drop,
-CODE DUP ( n - n n)   dup,
-CODE SWAP ( n1 n2 - n2 n1)   swap,
-CODE OVER ( n1 n2 - n1 n2 n1)   over,
-CODE 0< ( n - f)   zless,
-CODE AND ( n1 n2 - n3)   andd,
-CODE OR ( n1 n2 - n3)   orr,
-CODE XOR ( n1 n2 - n3)   xorr,
-CODE UM+ ( u1 u2 - ud)   uplus,
-CODE NEXT    next,
-CODE ?DUP ( n - n n|0)   qdup,
-CODE ROT ( n1 n2 n3 - n2 n3 n1)   rot,
-CODE 2DROP ( d1 d2)   ddrop,
-CODE 2DUP ( d - d d)   ddup,
-CODE + ( n1 n2 - n3)   plus,
-CODE NOT ( n1 - n2)   inver,
-CODE NEGATE ( n1 - n2)   negat,
-CODE DNEGATE ( d1 - d2)   dnega,
-CODE - ( n1 n2 - n3)   subb,
-CODE ABS ( n - u)   abss,
-CODE = ( n1 n2 - f)   equal,
-CODE U< ( u1 u2 - f)   uless,
-CODE < ( n1 n2 - f)   less,
-CODE UM/MOD ( ud u1 - mod quot)   ummod,
-CODE M/MOD ( d n - mod quot)   msmod,
-CODE /MOD ( n1 n2 - mod quot)   slmod,
-CODE MOD ( n1 n2 - mod)   mod,
-CODE / ( n1 n2 - n3)   slash,
-CODE UM* ( u1 u2 - ud)   umsta,
-CODE * ( n1 n2 - n3)   star,
-CODE M* ( n1 n2 - d)   mstar,
-CODE */MOD ( n1 n2 n3 - mod quot)   ssmod,
-CODE */ ( n1 n2 n3 - quot)   stasl,
-CODE PICK ( n - n1)   pick,
-CODE +! ( n a)   pstor,
-CODE 2! ( d a)   dstor,
-CODE 2@ ( a - d)   dat,
-CODE COUNT ( a - a+1 c)   count,
-CODE MAX ( n1 n2 - n3)   max,
-CODE MIN ( n1 n2 - n3)   min,
+CODE QBRANCH ( f)   qbran, END-CODE
+CODE BRANCH  bran, END-CODE
+CODE ! ( n a)   store, END-CODE
+CODE @ ( a - n)   at, END-CODE
+CODE C! ( c a)   cstor, END-CODE
+CODE C@ ( a - c)   cat, END-CODE
+CODE R> ( -n)   rfrom, END-CODE
+CODE R@ ( -n)   rat, END-CODE
+CODE >R ( n)   tor, END-CODE
+CODE DROP ( n)   drop, END-CODE
+CODE DUP ( n - n n)   dup, END-CODE
+CODE SWAP ( n1 n2 - n2 n1)   swap, END-CODE
+CODE OVER ( n1 n2 - n1 n2 n1)   over, END-CODE
+CODE 0< ( n - f)   zless, END-CODE
+CODE AND ( n1 n2 - n3)   andd, END-CODE
+CODE OR ( n1 n2 - n3)   orr, END-CODE
+CODE XOR ( n1 n2 - n3)   xorr, END-CODE
+CODE UM+ ( u1 u2 - ud)   uplus, END-CODE
+CODE NEXT    next, END-CODE
+CODE ?DUP ( n - n n|0)   qdup, END-CODE
+CODE ROT ( n1 n2 n3 - n2 n3 n1)   rot, END-CODE
+CODE 2DROP ( d1 d2)   ddrop, END-CODE
+CODE 2DUP ( d - d d)   ddup, END-CODE
+CODE + ( n1 n2 - n3)   plus, END-CODE
+CODE NOT ( n1 - n2)   inver, END-CODE
+CODE NEGATE ( n1 - n2)   negat, END-CODE
+CODE DNEGATE ( d1 - d2)   dnega, END-CODE
+CODE - ( n1 n2 - n3)   subb, END-CODE
+CODE ABS ( n - u)   abss, END-CODE
+CODE = ( n1 n2 - f)   equal, END-CODE
+CODE U< ( u1 u2 - f)   uless, END-CODE
+CODE < ( n1 n2 - f)   less, END-CODE
+CODE UM/MOD ( ud u1 - mod quot)   ummod, END-CODE
+CODE M/MOD ( d n - mod quot)   msmod, END-CODE
+CODE /MOD ( n1 n2 - mod quot)   slmod, END-CODE
+CODE MOD ( n1 n2 - mod)   mod, END-CODE
+CODE / ( n1 n2 - n3)   slash, END-CODE
+CODE UM* ( u1 u2 - ud)   umsta, END-CODE
+CODE * ( n1 n2 - n3)   star, END-CODE
+CODE M* ( n1 n2 - d)   mstar, END-CODE
+CODE */MOD ( n1 n2 n3 - mod quot)   ssmod, END-CODE
+CODE */ ( n1 n2 n3 - quot)   stasl, END-CODE
+CODE PICK ( n - n1)   pick, END-CODE
+CODE +! ( n a)   pstor, END-CODE
+CODE 2! ( d a)   dstor, END-CODE
+CODE 2@ ( a - d)   dat, END-CODE
+CODE COUNT ( a - a+1 c)   count, END-CODE
+CODE MAX ( n1 n2 - n3)   max, END-CODE
+CODE MIN ( n1 n2 - n3)   min, END-CODE
 
 32 CONSTANT BL
  4 CONSTANT CELL
@@ -83,12 +86,12 @@ CODE MIN ( n1 n2 - n3)   min,
 : CELL/ ( n - n/C)   CELL / ;
 : 1+ ( n - n+1)   1 + ;
 : 1- ( n - n-1)   1 - ;
-CODE DOVAR ( - a)   dovar,
+CODE DOVAR ( - a)   dovar, END-CODE
 
 
 ( Common Colon Words ========================================= )
 
-: ?KEY ( - c -1|0)   ?RX ;
+: ?KEY ( - c t|0)   ?RX ;
 : KEY ( - c)  BEGIN ?KEY UNTIL ;
 : EMIT ( c)   TX! ;
 : WITHIN ( n lo hi - f)   OVER - >R - R> U< ;
@@ -122,7 +125,7 @@ CODE DOVAR ( - a)   dovar,
 : DIGIT? ( c base - n f)   >R >upper $30 - 9 OVER <
    IF 7 - DUP $0A < OR THEN
    DUP R> U< ;
-: NUMBER? ( a - n -1| a 0)   BASE @ >R 0 OVER COUNT OVER C@ $24 =
+: NUMBER? ( a - n t|a 0)   BASE @ >R 0 OVER COUNT OVER C@ $24 =
    IF HEX SWAP 1+ SWAP 1- THEN
    OVER C@ $2D = >R SWAP R@ - SWAP R@ + ?DUP
    IF 1- 
@@ -221,15 +224,17 @@ CODE DOVAR ( - a)   dovar,
 
 ( Text Interpreter =========================================== )
 
-: ABORT  'ABORT @EXECUTE ;
-: abort" ( f)   IF do$ COUNT TYPE ABORT THEN do$ DROP ;
-: ERROR  SPACE COUNT TYPE $3F EMIT $1B EMIT CR ABORT ; ( but ; is not necessary)
+: ABORT  'ABORT @EXECUTE ; RECOVER
+: abort" ( f)   IF  do$ COUNT TYPE ABORT  THEN  do$ DROP ;
+: ERROR  SPACE COUNT TYPE $3F EMIT $1B EMIT CR ABORT ; RECOVER
 : $INTERPRET ( a)
    NAME? ?DUP 
-   IF C@ -COMPO- AND ABORT" compile only"
+   IF C@ COMPO AND ABORT" compile only"
       EXECUTE EXIT
-   THEN NUMBER?
-   IF EXIT ELSE ERROR THEN ;
+   THEN
+   NUMBER? IF   EXIT
+           ELSE ERROR
+           THEN ; RECOVER
 : [  ['] $INTERPRET 'EVAL ! ; IMMEDIATE
 : .OK  CR ['] $INTERPRET 'EVAL @ =
    IF >R >R >R  DUP . R>  DUP . R>  DUP . R> DUP . ." ok>" THEN ;
@@ -245,23 +250,21 @@ CODE DOVAR ( - a)   dovar,
 : $,"  $22 WORD COUNT + ALIGNED CP ! ;
 : ?UNIQUE ( a - a)
    DUP NAME? ?DUP
-   IF COUNT $1F AND SPACE TYPE ." reDef"
-   THEN DROP ;
+   IF   COUNT $1F AND SPACE TYPE ." reDef"  THEN  DROP ;
 : $,n ( a)   DUP @ 
-   IF UNIQUE? DUP NAME> CP ! DUP LAST ! CELL- CONTEXT @ SWAP ! EXIT
-   THEN ERROR ; RECOVER
-: ' ( <name> - a)   TOKEN NAME?  IF EXIT THEN ERROR ; RECOVER
+   IF  UNIQUE? DUP NAME> CP ! DUP LAST ! CELL- CONTEXT @ SWAP ! EXIT  THEN
+   ERROR ; RECOVER
+: ' ( <name> - a)   TOKEN NAME?  IF  EXIT  THEN  ERROR ; RECOVER
 : [COMPILE] ( <name>)   ' , ; IMMEDIATE
 : COMPILE ( <name>)   R> DUP @ , CELL+ >R ;
 : $COMPILE ( a)
    NAME? ?DUP
-   IF @ -IMMEDD- AND
-   IF EXECUTE
-   ELSE ,
-   THEN EXIT
-   THEN NUMBER?
-   IF LITERAL EXIT
-   THEN ERROR ; RECOVER
+   IF @ IMEDD AND
+      IF   EXECUTE
+      ELSE ,
+      THEN  EXIT
+   THEN  NUMBER?
+   IF  LITERAL EXIT  THEN  ERROR ; RECOVER
 : OVERT  LAST @ CONTEXT ! ;
 : ]  ['] $COMPILE 'EVAL ! ;
 : : ( <name>)  TOKEN $,n ] 6 , ;
@@ -269,12 +272,10 @@ CODE DOVAR ( - a)   dovar,
 
 
 ( Debugging Tools ============================================ )
-\ : dm+  OVER 6 U.R FOR AFT DUP @ 9 U.R CELL+ THEN NEXT ;
-: dm+  OVER 6 U.R FOR AFT DUP @ [ 2 CELLS 1+ ] LITERAL U.R CELL+ THEN NEXT ;
+: dm+  OVER 6 U.R FOR  AFT DUP @ 9 U.R CELL+ THEN  NEXT ;
 : DUMP ( a #)
    BASE @ >R HEX $1F + $20 /
-   \ FOR AFT CR 8 2DUP dm+ >R SPACE CELLS TYPE R> THEN NEXT
-   FOR AFT CR [ $20 CELL/ ] LITERAL 2DUP dm+ >R SPACE CELLS TYPE R> THEN NEXT
+   FOR  AFT CR 8 2DUP dm+ >R SPACE CELLS TYPE R> THEN  NEXT
    DROP R> BASE ! ;
 : >NAME ( cfa - nfa|0)  CONTEXT
    BEGIN @ DUP WHILE
@@ -293,17 +294,15 @@ CODE DOVAR ( - a)   dovar,
            THEN
       NUF?
    UNTIL  DROP ;
-: WORDS  CR CONTEXT 0 tmp ! 
-   BEGIN @ ?DUP  WHILE
-      DUP SPACE .ID CELL- tmp @ $0A <
-      IF 1 tmp +!
-      ELSE CR 0 tmp !
-      THEN
+: WORDS  CR CONTEXT  0 tmp ! 
+   BEGIN  @ ?DUP  WHILE
+      DUP SPACE .ID CELL- 
+      tmp @ $0A < IF  1 tmp +!  ELSE  CR 0 tmp  !  THEN
    REPEAT ;
 : FORGET  TOKEN NAME? ?DUP
-   IF CELL- DUP CP ! @ DUP CONTEXT ! LAST ! DROP EXIT
-   THEN ERROR ; RECOVER
-: COLD  CR ." eForth in C, Ver 2.3,2017 ");
+   IF  CELL- DUP CP ! @ DUP CONTEXT ! LAST ! DROP EXIT  THEN
+   ERROR ; RECOVER
+: COLD  CR ." eForth in C, Ver 2.3,2017 " CR QUIT ; RECOVER
 
 
 ( Structure Compiler ========================================= )
@@ -325,9 +324,9 @@ CODE DOVAR ( - a)   dovar,
 : $" ( <text>")   ['] $"| HERE ! $," ; IMMEDIATE
 : ." ( <text>")   ['] ."| HERE ! $," ; IMMEDIATE
 : CODE  TOKEN $,n OVERT ;
-: CREATE ( <name>)   CODE $203D , ;
+: CREATE ( <name>)   CODE $203D , ; ( BORD)
 : VARIABLE ( <name>)   CREATE 0 , ;
-: CONSTANT ( n <name>)   CODE $2004 , , ;
+: CONSTANT ( n <name>)   CODE $2004 , , ; ( BORD)
 : .( ( <text>)  $29 PARSE TYPE ; IMMEDIATE
 : \  $0A WORD DROP ; IMMEDIATE
 : (  $29 PARSE 2DROP ; IMMEDIATE
@@ -345,9 +344,9 @@ dolist, ' COLD ,
 $80 4 CELLS +
             $100 , ( 'TIB)
              $10 , ( BASE)
-' IMMEDIATE 12 - , ( CONTEXT: IMMEDIATE's NFA)
+' IMMEDIATE 12 - , ( CONTEXT: nfa of IMMEDIATE)
              end , ( CP)
-' IMMEDIATE 12 - , ( LAST: IMMEDIATE's NFA)
-    ' $INTERPRET , ( 'EVAL)
-          ' QUIT , ( 'ABORT)
+' IMMEDIATE 12 - , ( LAST: nfa of IMMEDIATE)
+    ' $INTERPRET , ( 'EVAL: cfa of $INTERPRET)
+          ' QUIT , ( 'ABORT: cfa of QUIT)
                0 , ( tmp)
