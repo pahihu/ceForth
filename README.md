@@ -1,7 +1,7 @@
 ceForth V3.3
 ============
 
-**Note**: This is C.H.Ting's [ceForth V3.3](http://www.forth.org/OffeteStore/2177-ceForth_33_macroAssemblerVS2019.zip) All modifications and bugs introduced are mine.
+**Note**: This is C.H.Ting's [ceForth V3.3](http://www.forth.org/OffeteStore/2177-ceForth_33_macroAssemblerVS2019.zip) All modifications and bugs introduced are mine. I am sure, this will NOT work on big-endian machines.
 
 Change `BytesPerWord` to 2/4/8 to define the word width. `#define STC` to use switch-threaded interpreter, add `#define GCC_DISPATCH` to use GCC's goto. 
 
