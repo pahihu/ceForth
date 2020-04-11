@@ -35,6 +35,7 @@
 #include <stdint.h>
 
 #include <unistd.h>
+#include <sys/time.h>
 #ifdef USE_CURTERM
 #include "curterm.h"
 #endif
@@ -108,6 +109,7 @@ int R = 0;
 word_t  P, IP;
 #endif
 
+struct timeval t0;
 word_t data[16000] = {};
 unsigned char* cData = (unsigned char*)data;
 
@@ -555,6 +557,7 @@ PRIMITIVE(clit)
         NEXT_BYTECODE;
 PEND
 PRIMITIVE(sys)
+        struct timeval tv;
         NEXT_BYTECODE;
         WP = top; pop;
         switch (WP) {
@@ -593,6 +596,11 @@ PRIMITIVE(sys)
         case 2: /* MS */
                 usleep(1000 * top);
                 pop;
+                break;
+        case 3: /* COUNTER */
+                gettimeofday (&tv, NULL);
+                tv.tv_usec /= 1000;
+                push(word_t) (tv.tv_sec-t0.tv_sec)*1000+(tv.tv_usec-t0.tv_usec);
                 break;
         default:
                 printf("unknown SYS %X\n", WP);
@@ -1205,6 +1213,8 @@ int main(int ac, char* av[])
 	word_t DOVAR = CODE(2, as_dovar, as_next);
 	HEADER(2, "MS");
 	word_t MSS = CODE(4, as_clit, 2, as_sys, as_next);
+        HEADER(7,"COUNTER");
+        word_t COUNTER = CODE(4, as_clit, 3, as_sys, as_next);
 
 	// Common Colon Words
 
@@ -1646,6 +1656,9 @@ int main(int ac, char* av[])
 #else
         load ();
 #endif
+
+        gettimeofday (&t0, NULL);
+        t0.tv_usec /= 1000;
 
 	printf("\nceForth v3.3, 01jul19cht\n");
 
