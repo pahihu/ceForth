@@ -24,23 +24,22 @@
 
 //Preamble
 
-#include <stdlib.h>
-#include <stdio.h>
-#ifndef __APPLE__
-#include <tchar.h>
-#endif
-#include <stdarg.h>
-#include <string.h>
+# include <stdlib.h>
+# include <stdio.h>
+# ifndef __APPLE__
+#  include <tchar.h>
+# endif
+# include <stdarg.h>
+# include <string.h>
 
-#include <stdint.h>
+# include <stdint.h>
+# include <unistd.h>
+# include <sys/time.h>
+# ifdef USE_CURTERM
+#  include "curterm.h"
+# endif
 
-#include <unistd.h>
-#include <sys/time.h>
-#ifdef USE_CURTERM
-#include "curterm.h"
-#endif
-
-#define BytesPerWord 8
+# define BytesPerWord 8
 
 # if BytesPerWord==8
 
@@ -92,28 +91,26 @@ typedef uint32_t udword_t;
 # define	pushR   rack[255 & (++R)]
 
 # define        CODEALIGN   while (P & (BytesPerWord-1)) { cData[P++] = 0; }
-# define        SYSVARBASE  0X80
+# define        UBASE       0X80
 
 
-/*
-#define STC             1
-#define GCC_DISPATCH    1
-*/
-
-
+# define MEM_SIZE        16000
+# define STACK_SIZE        256
+# define RACK_SIZE         256
 word_t  IZ, thread;
 
-#ifdef STC
-word_t rack[256] = { 0 };
-int R = 0;
-word_t  P, IP;
-#endif
-
-struct timeval t0;
-word_t data[16000] = {};
+word_t data[MEM_SIZE] = {};
 unsigned char* cData = (unsigned char*)data;
 
-#define do_list(x) \
+# ifdef STC
+word_t *rack = data + MEM_SIZE - RACK_SIZE;
+int R = 0;
+word_t  P, IP;
+# endif
+
+struct timeval t0;
+
+# define do_list(x) \
         x(nop)   x(bye)    x(qrx)   x(txsto) x(docon) x(dolit) x(dolist) x(exitt) \
         x(execu) x(donext) x(qbran) x(bran)  x(store) x(at)    x(cstor)  x(cat)   \
         x(rpat)  x(rpsto)  x(rfrom) x(rat)   x(tor)   x(spat)  x(spsto)  x(drop)  \
@@ -122,91 +119,100 @@ unsigned char* cData = (unsigned char*)data;
         x(dnega) x(subb)   x(abss)  x(equal) x(uless) x(less)  x(ummod)  x(msmod) \
         x(slmod) x(mod)    x(slash) x(umsta) x(star)  x(mstar) x(ssmod)  x(stasl) \
         x(pick)  x(pstor)  x(dstor) x(dat)   x(count) x(dovar) x(max)    x(min)   \
-        x(clit)  x(sys)
+        x(clit)  x(sys)    x(douse)
 
 // Byte Code Assembler
 
-#define do_as(x)        as_##x,
+# define do_as(x)        as_##x,
 enum { do_list(do_as)   as_numbytecodes } ByteCodes;
 
 
-#ifdef STC
+# ifdef STC
 static void stc(void) {
-#else
-#define do_decl(x)      static void P##x(void);
+# else
+#  define do_decl(x)      static void P##x(void);
 do_list(do_decl)
-#endif
+# endif
 
-word_t rack[256] = { 0 };
-word_t stack[256] = { 0 };
+word_t *rack;
+word_t *stack;
 dword_t d, n, m;
 int R = 0;
 int S = 0;
 word_t  top = 0;
-word_t  P, IP, WP;
+word_t  P, IP, WP, UP;
 unsigned char bytecode, c;
-#ifdef GCC_DISPATCH
-#define do_label(x)     &&L##x,
+
+# ifdef GCC_DISPATCH
+#  define do_label(x)     &&L##x,
         static void *dispatch[] = {
                 do_list(do_label)
                 0
         };
-#endif
+# endif
 
 
-#define macNEXT         P = data[TOWORDS(IP)]; WP = P + BytesPerWord; IP += BytesPerWord;
-#define macDROP         pop
-#define macOVER 	push stack[255 & (S - 1)];
-#define macINVER	top = -top - 1;
-#define macTOR          rack[255 & (++R)] = top; pop;
-#define macUPLUS        stack[255 & S] += top; top = LOWER(stack[255 & S], top);
-#define macRFROM        push rack[255 & (R--)];
-#define macPLUS         top += stack[255 & (S--)];
+# define macNEXT         P = data[TOWORDS(IP)]; WP = P + BytesPerWord; IP += BytesPerWord;
+# define macDROP         pop
+# define macOVER 	 push stack[255 & (S - 1)];
+# define macINVER	 top = -top - 1;
+# define macTOR          rack[255 & (++R)] = top; pop;
+# define macUPLUS        stack[255 & S] += top; top = LOWER(stack[255 & S], top);
+# define macRFROM        push rack[255 & (R--)];
+# define macPLUS         top += stack[255 & (S--)];
 
-#ifdef STC 
-# define FETCH_CODE      bytecode = (unsigned char)cData[P++];
-# define doNEXT          macNEXT
-# ifdef GCC_DISPATCH
-#  define PRIMITIVE(x)   L##x:
-#  ifdef __clang__
-#   define NEXT_BYTECODE
-#   define PEND          FETCH_CODE; goto *dispatch[bytecode];
+# ifdef STC 
+#  define FETCH_CODE            bytecode = (unsigned char)cData[P++];
+#  define doNEXT                macNEXT
+#  ifdef GCC_DISPATCH
+#   define PRIMITIVE(x)         L##x: {
+#   ifdef __clang__
+#    define NEXT_BYTECODE
+#    define PEND                FETCH_CODE; goto *dispatch[bytecode]; }
+#   else
+#    define NEXT_BYTECODE       FETCH_CODE
+#    define PEND                goto *dispatch[bytecode]; }
+#   endif
 #  else
-#   define NEXT_BYTECODE FETCH_CODE
-#   define PEND          goto *dispatch[bytecode];
+#   define NEXT_BYTECODE
+#   define PRIMITIVE(x)         case as_##x: {
+#   define PEND                 FETCH_CODE; } break;
 #  endif
 # else
-#  define PRIMITIVE(x)   case as_##x:
-#  define PEND           FETCH_CODE; break;
+#  define PRIMITIVE(x)          static void P##x(void) {
+#  define PEND                  }
+#  define doNEXT                Pnext()
+#  define NEXT_BYTECODE
 # endif
-#else
-# define PRIMITIVE(x)    static void P##x(void) {
-# define PEND            }
-# define doNEXT          Pnext()
-# define NEXT_BYTECODE
-#endif
 
 // Virtual Forth Machine
-#ifdef STC
+# ifdef STC
 	P = 0;
 	WP = BytesPerWord;
 	IP = 0;
-	S = 0;
-	R = 0;
 	top = 0;
-#ifdef GCC_DISPATCH
-        PEND;
-#else
+
+        rack   = data + MEM_SIZE - RACK_SIZE;
+        stack  = rack - STACK_SIZE;
+        *stack = 0; S = 0;
+        *rack  = 0; R = 0;
+
+        UP = UBASE;
+        data[TOWORDS(UP)] = TOBYTES(stack - data);
+
         FETCH_CODE;
+#  ifdef GCC_DISPATCH
+        goto *dispatch[bytecode];
+#  else
         while (TRUE) {
                 switch (bytecode) {
-#endif
-#endif
+#  endif
+# endif
 
 PRIMITIVE(bye)
-#ifdef _CURTERM_H
+# ifdef _CURTERM_H
         prepterm(0);
-#endif
+# endif
 	exit(0);
 PEND
 PRIMITIVE(next)
@@ -228,6 +234,10 @@ PEND
 PRIMITIVE(docon)
         NEXT_BYTECODE;
 	push data[TOWORDS(WP)];
+PEND
+PRIMITIVE(douse)
+        NEXT_BYTECODE;
+        push UP + data[TOWORDS(WP)];
 PEND
 PRIMITIVE(dolit)
 	push data[TOWORDS(IP)];
@@ -295,12 +305,15 @@ PRIMITIVE(cat)
 	top = (word_t)cData[top];
 PEND
 PRIMITIVE(rpat)
-        doNEXT;
         NEXT_BYTECODE;
+        push TOBYTES(rack + R - data);
 PEND
 PRIMITIVE(rpsto)
-        doNEXT;
         NEXT_BYTECODE;
+        WP = top; pop;
+        WP = TOWORDS(WP);
+        rack = data + (WP & ~(uword_t)0XFF);
+        R    = 0XFF & WP;
 PEND
 PRIMITIVE(rfrom)
         NEXT_BYTECODE;
@@ -315,12 +328,16 @@ PRIMITIVE(tor)
         macTOR;
 PEND
 PRIMITIVE(spat)
-        doNEXT;
         NEXT_BYTECODE;
+        WP = stack + S - data;
+        push TOBYTES(WP);
 PEND
 PRIMITIVE(spsto)
-        doNEXT;
         NEXT_BYTECODE;
+        WP = top; pop;
+        WP = TOWORDS(WP);
+        stack = data + (WP & ~(uword_t)0XFF);
+        S     = 0XFF & WP;
 PEND
 PRIMITIVE(drop)
         NEXT_BYTECODE;
@@ -438,7 +455,7 @@ PRIMITIVE(ummod)
 	n = (dword_t)((uword_t)stack[255 & (S - 1)]);
 # if BytesPerWord != 8
 	n += m << BitsPerWord;
-#endif
+# endif
 	pop;
 	top = (uword_t)(n / d);
 	stack[255 & S] = (uword_t)(n % d);
@@ -558,11 +575,12 @@ PRIMITIVE(clit)
 PEND
 PRIMITIVE(sys)
         struct timeval tv;
+
         NEXT_BYTECODE;
         WP = top; pop;
         switch (WP) {
         case 0: /* ?RX */
-#ifdef _CURTERM_H
+# ifdef _CURTERM_H
                 if (isatty(fileno(stdin))) {
                         if (has_key()) {
                                 push(word_t) getkey();
@@ -573,24 +591,22 @@ PRIMITIVE(sys)
                 } else {
                         push(word_t) getchar();
                 }
-#else
+# else
 	        push(word_t) getchar();
-#endif
+# endif
 	        if (top != 0) {
                         // printf ("?RX => %d\n", top);
                         push TRUE;
                 }
                 break;
         case 1: /* TX! */
-#ifdef _CURTERM_H
-                prepterm(0);
+# ifdef _CURTERM_H
                 putchar((char)top);
-                prepterm(1);
                 if (isatty(fileno(stdout)))
                         fflush(stdout);
-#else
+# else
 	        putchar((char)top);
-#endif
+# endif
 	        pop;
                 break;
         case 2: /* MS */
@@ -607,15 +623,15 @@ PRIMITIVE(sys)
         }
 PEND
 
-#ifdef STC
-#ifdef GCC_DISPATCH
+# ifdef STC
+#  ifdef GCC_DISPATCH
         }
-#else
+#  else
         }}}
-#endif
-#endif
+#  endif
+# endif
 
-#ifndef STC
+# ifndef STC
 void(*primitives[as_numbytecodes])(void) = {
 	/* case 0 */ Pnop,
 	/* case 1 */ Pbye,
@@ -633,13 +649,13 @@ void(*primitives[as_numbytecodes])(void) = {
 	/* case 13 */ Pat,
 	/* case 14 */ Pcstor,
 	/* case 15 */ Pcat,
-	/* case 16  rpat, */ Pnop,
-	/* case 17  rpsto, */ Pnop,
+	/* case 16 */ Prpat,
+	/* case 17 */ Prpsto,
 	/* case 18 */ Prfrom,
 	/* case 19 */ Prat,
 	/* case 20 */ Ptor,
-	/* case 21 spat, */ Pnop,
-	/* case 22 spsto, */ Pnop,
+	/* case 21 */ Pspat,
+	/* case 22 */ Pspsto,
 	/* case 23 */ Pdrop,
 	/* case 24 */ Pdup,
 	/* case 25 */ Pswap,
@@ -682,11 +698,12 @@ void(*primitives[as_numbytecodes])(void) = {
 	/* case 62 */ Pmax,
 	/* case 63 */ Pmin,
         /* case 64 */ Pclit,
-        /* case 65 */ Psys
+        /* case 65 */ Psys,
+        /* case 66 */ Pdouse,
 };
-#endif
+# endif
 
-#ifdef BOOT
+# ifdef BOOT
 // Macro Assembler
 
 const word_t IMEDD = 0x80;
@@ -712,6 +729,11 @@ void HEADER(int lex, const char seq[]) {
 	printf("\n");
 	printf("%s",seq);
 	printf(" %X", P);
+}
+void C0MMA(word_t j) {
+        IP = TOWORDS(P);
+        data[IP++] = j;
+        P = TOBYTES(IP);
 }
 word_t CODE(int len, ...) {
 	word_t addr = P;
@@ -1014,7 +1036,7 @@ void save (void)
         fclose (fout);
 }
 
-#else
+# else
 
 /*
 * Load image.
@@ -1035,7 +1057,7 @@ void load (void)
         fclose (fin);
 }
 
-#endif
+# endif
 
 /*
 * Main Program
@@ -1043,37 +1065,44 @@ void load (void)
 int main(int ac, char* av[])
 {
 	cData = (unsigned char*)data;
-#ifdef BOOT
-	P = 512;
-	R = 0;
+        rack  = data + MEM_SIZE - RACK_SIZE;
 
+# ifdef BOOT
+        *rack = 0; R = 0;
+	P = 512;
 
 	// Kernel
 
+        // ...status
+
+        HEADER(8, "follower");
+        word_t FOLLOWER = CODE(2, as_douse, as_next); C0MMA( 0*BytesPerWord);
+        HEADER(3, "SP0");
+        word_t SP0 =   CODE(2, as_douse, as_next); C0MMA( 1*BytesPerWord);
 	HEADER(3, "HLD");
-	word_t HLD =   CODE(3, as_clit, SYSVARBASE +  0*BytesPerWord, as_next);   
+	word_t HLD =   CODE(2, as_douse, as_next); C0MMA( 2*BytesPerWord);
 	HEADER(4, "SPAN");
-	word_t SPAN =  CODE(3, as_clit, SYSVARBASE +  1*BytesPerWord, as_next);
+	word_t SPAN =  CODE(2, as_douse, as_next); C0MMA( 3*BytesPerWord);
 	HEADER(3, ">IN");
-	word_t INN =   CODE(3, as_clit, SYSVARBASE +  2*BytesPerWord, as_next);
+	word_t INN =   CODE(2, as_douse, as_next); C0MMA( 4*BytesPerWord);
 	HEADER(4, "#TIB");
-	word_t NTIB =  CODE(3, as_clit, SYSVARBASE +  3*BytesPerWord, as_next);
+	word_t NTIB =  CODE(2, as_douse, as_next); C0MMA( 5*BytesPerWord);
 	HEADER(4, "'TIB");
-	word_t TTIB =  CODE(3, as_clit, SYSVARBASE +  4*BytesPerWord, as_next);
+	word_t TTIB =  CODE(2, as_douse, as_next); C0MMA( 6*BytesPerWord);
 	HEADER(4, "BASE");
-	word_t BASE =  CODE(3, as_clit, SYSVARBASE +  5*BytesPerWord, as_next);
+	word_t BASE =  CODE(2, as_douse, as_next); C0MMA( 7*BytesPerWord);
 	HEADER(7, "CONTEXT");
-	word_t CNTXT = CODE(3, as_clit, SYSVARBASE +  6*BytesPerWord, as_next);
+	word_t CNTXT = CODE(2, as_douse, as_next); C0MMA( 8*BytesPerWord);
 	HEADER(2, "CP");
-	word_t CP =    CODE(3, as_clit, SYSVARBASE +  7*BytesPerWord, as_next);
+	word_t CP =    CODE(2, as_douse, as_next); C0MMA( 9*BytesPerWord);
 	HEADER(4, "LAST");
-	word_t LAST =  CODE(3, as_clit, SYSVARBASE +  8*BytesPerWord, as_next);
+	word_t LAST =  CODE(2, as_douse, as_next); C0MMA(10*BytesPerWord);
 	HEADER(5, "'EVAL");
-	word_t TEVAL = CODE(3, as_clit, SYSVARBASE +  9*BytesPerWord, as_next);
+	word_t TEVAL = CODE(2, as_douse, as_next); C0MMA(11*BytesPerWord);
 	HEADER(6, "'ABORT");
-	word_t TABRT = CODE(3, as_clit, SYSVARBASE + 10*BytesPerWord, as_next);
+	word_t TABRT = CODE(2, as_douse, as_next); C0MMA(12*BytesPerWord);
 	HEADER(3, "tmp");
-	word_t TEMP =  CODE(3, as_clit, SYSVARBASE + 11*BytesPerWord, as_next);
+	word_t TEMP =  CODE(2, as_douse, as_next); C0MMA(13*BytesPerWord);
 
 	HEADER(3, "NOP");
 	word_t NOP = CODE(1, as_next);
@@ -1631,7 +1660,7 @@ int main(int ac, char* av[])
         IZ = P;
 	P = 0;
 	word_t RESET = LABEL(2, as_dolist, COLD);
-	P = SYSVARBASE + BytesPerWord * 4;
+	P = UBASE + 6 * BytesPerWord;
 	word_t USER = LABEL(8, 
                          0x100,                                 // TIB
                          0x10,                                  // BASE
@@ -1642,6 +1671,7 @@ int main(int ac, char* av[])
                          QUITT,                                 // 'ABORT
                          0);                                    // temp
 
+
 	// dump dictionary
 	//P = 0;
 	//for (len = 0; len < 0x200; len++) { CheckSum(); }
@@ -1649,39 +1679,43 @@ int main(int ac, char* av[])
         printf ("\nSaving ceForth v3.3, 01jul19cht\n");
         save ();
 
-#ifndef STANDALONE
+#  ifndef STANDALONE
         exit (0);
-#endif
+#  endif
 
-#else
+# else
         load ();
-#endif
+# endif
 
         gettimeofday (&t0, NULL);
         t0.tv_usec /= 1000;
 
 	printf("\nceForth v3.3, 01jul19cht\n");
 
-#ifdef _CURTERM_H
+# ifdef _CURTERM_H
         if (isatty(fileno(stdin))) {
                 prepterm(1);
                 kbflush();
         }
-#endif
+# endif
 
-#ifdef STC
+# ifdef STC
         stc ();
-#else
+# else
+        stack = rack - STACK_SIZE;
+        UP    = UBASE;
+        data[TOWORDS(UP)] = TOBYTES(stack - data);
+
 	P = 0;
 	WP = 4;
 	IP = 0;
-	S = 0;
-	R = 0;
+        *stack = 0; S = 0;
+        *rack  = 0; R = 0;
 	top = 0;
 	while (TRUE) {
 		primitives[(unsigned char)cData[P++]]();
 	}
-#endif
+# endif
         return 0;
 }
 /* End of ceforth_33.cpp */

@@ -14,6 +14,9 @@ pahihu    7 / 4 / 2020
 Changes
 =======
 
+* added douse
+* added rpat, rpsto, spat, spsto
+* embedded stack/rack
 * fixed >NAME, changed dm+ and DUMP to adapt to BytesPerWord
 * added SEE
 * added polled terminal I/O (curterm.h), nuf?
