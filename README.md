@@ -14,6 +14,7 @@ pahihu    7 / 4 / 2020
 Changes
 =======
 
+* removed douse, added >ABS >REL DLSYM CALLC, moved additions to system.f/utils.f/timer.f
 * added douse
 * added rpat, rpsto, spat, spsto
 * embedded stack/rack

@@ -31,17 +31,14 @@
 # endif
 # include <stdarg.h>
 # include <string.h>
-
 # include <stdint.h>
 # include <unistd.h>
-# include <sys/time.h>
-# ifdef USE_CURTERM
-#  include "curterm.h"
-# endif
+# include <dlfcn.h>
+# include "curterm.h"
 
-# define BytesPerWord 8
+# define BPW 8
 
-# if BytesPerWord==8
+# if BPW==8
 
 typedef int64_t word_t;
 typedef uint64_t uword_t;
@@ -52,7 +49,7 @@ typedef uint64_t udword_t;
 # define UpperMask  ((uword_t)0x5F5F5F5F5F5F5F5FULL)
 # define VaType     word_t
 
-# elif BytesPerWord==4
+# elif BPW==4
 
 typedef int32_t word_t;
 typedef uint32_t uword_t;
@@ -63,7 +60,7 @@ typedef uint64_t udword_t;
 # define UpperMask  ((uword_t)0x5F5F5F5FUL)
 # define VaType     word_t
 
-# elif BytesPerWord==2
+# elif BPW==2
 
 typedef int16_t word_t;
 typedef uint16_t uword_t;
@@ -78,8 +75,13 @@ typedef uint32_t udword_t;
 # error Unknown word size!
 # endif
 
-# define        BitsPerWord     (8*(BytesPerWord))
-# define        Round(x)        ((((x) + BytesPerWord - 1) / BytesPerWord) * BytesPerWord)
+# if BYTE_ORDER==1234
+#  define MKWORD(c1,c2)   ((c1)+((c2)<<8))
+# else
+#  define MKWORD(c1,c2)   (((c1)<<(8*(BPW-1)))+((c2)<<(8*(BPW-2))))
+# endif
+
+# define        Round(x)        (((x) + BPW-1) & ~(uword_t)(BPW-1))
 
 # define	FALSE	0
 # define	TRUE	-1
@@ -90,8 +92,14 @@ typedef uint32_t udword_t;
 # define	popR    rack[255 & (R--)]
 # define	pushR   rack[255 & (++R)]
 
-# define        CODEALIGN   while (P & (BytesPerWord-1)) { cData[P++] = 0; }
-# define        UBASE       0X80
+# define        CODEALIGN   while (P & (BPW-1)) { cData[P++] = 0; }
+# define        SYSVARS     0X80
+
+int p2(void *p1, void *p2)
+{
+        printf ("p1 = %p p2 = %p\n", p1, p2);
+        return 42;
+}
 
 
 # define MEM_SIZE        16000
@@ -108,35 +116,38 @@ int R = 0;
 word_t  P, IP;
 # endif
 
-struct timeval t0;
+# define do_opsys(x) \
+        x(qrx)   x(txsto)  x(toabs) x(torel) x(dlsym)  x(callc)
 
-# define do_list(x) \
-        x(nop)   x(bye)    x(qrx)   x(txsto) x(docon) x(dolit) x(dolist) x(exitt) \
+# define do_codes(x) \
+        x(nop)   x(bye)    x(sys)   x(clit)  x(docon) x(dolit) x(dolist) x(exitt) \
         x(execu) x(donext) x(qbran) x(bran)  x(store) x(at)    x(cstor)  x(cat)   \
         x(rpat)  x(rpsto)  x(rfrom) x(rat)   x(tor)   x(spat)  x(spsto)  x(drop)  \
         x(dup)   x(swap)   x(over)  x(zless) x(andd)  x(orr)   x(xorr)   x(uplus) \
         x(next)  x(qdup)   x(rot)   x(ddrop) x(ddup)  x(plus)  x(inver)  x(negat) \
         x(dnega) x(subb)   x(abss)  x(equal) x(uless) x(less)  x(ummod)  x(msmod) \
         x(slmod) x(mod)    x(slash) x(umsta) x(star)  x(mstar) x(ssmod)  x(stasl) \
-        x(pick)  x(pstor)  x(dstor) x(dat)   x(count) x(dovar) x(max)    x(min)   \
-        x(clit)  x(sys)    x(douse)
+        x(pick)  x(pstor)  x(dstor) x(dat)   x(count) x(dovar) x(max)    x(min)
 
 // Byte Code Assembler
 
-# define do_as(x)        as_##x,
-enum { do_list(do_as)   as_numbytecodes } ByteCodes;
+# define def_as(x)       as_##x,
+enum { do_codes(def_as)  as_numbytecodes } ByteCodes;
+
+# define def_sys(x)      sys_##x,
+enum { do_opsys(def_sys) sys_numsyscalls } SysCalls;
 
 
 # ifdef STC
 static void stc(void) {
 # else
 #  define do_decl(x)      static void P##x(void);
-do_list(do_decl)
+do_codes(do_decl)
 # endif
 
+dword_t d, n, m;
 word_t *rack;
 word_t *stack;
-dword_t d, n, m;
 int R = 0;
 int S = 0;
 word_t  top = 0;
@@ -146,13 +157,13 @@ unsigned char bytecode, c;
 # ifdef GCC_DISPATCH
 #  define do_label(x)     &&L##x,
         static void *dispatch[] = {
-                do_list(do_label)
+                do_codes(do_label)
                 0
         };
 # endif
 
 
-# define macNEXT         P = data[TOWORDS(IP)]; WP = P + BytesPerWord; IP += BytesPerWord;
+# define macNEXT         P = data[TOWORDS(IP)]; WP = P + BPW; IP += BPW;
 # define macDROP         pop
 # define macOVER 	 push stack[255 & (S - 1)];
 # define macINVER	 top = -top - 1;
@@ -188,7 +199,7 @@ unsigned char bytecode, c;
 // Virtual Forth Machine
 # ifdef STC
 	P = 0;
-	WP = BytesPerWord;
+	WP = BPW;
 	IP = 0;
 	top = 0;
 
@@ -196,9 +207,6 @@ unsigned char bytecode, c;
         stack  = rack - STACK_SIZE;
         *stack = 0; S = 0;
         *rack  = 0; R = 0;
-
-        UP = UBASE;
-        data[TOWORDS(UP)] = TOBYTES(stack - data);
 
         FETCH_CODE;
 #  ifdef GCC_DISPATCH
@@ -210,23 +218,80 @@ unsigned char bytecode, c;
 # endif
 
 PRIMITIVE(bye)
-# ifdef _CURTERM_H
         prepterm(0);
-# endif
 	exit(0);
+PEND
+PRIMITIVE(sys)
+        NEXT_BYTECODE;
+        WP = top; pop;
+        switch (WP) {
+        case sys_qrx: /* ?RX ( - c t|0) */
+                if (isatty(fileno(stdin))) {
+                        if (has_key()) {
+                                push(word_t) getkey();
+                                kbflush();
+                        } else {
+                                push 0;
+                        }
+                } else {
+                        push(word_t) getchar();
+                }
+	        if (top != 0) {
+                        push TRUE;
+                }
+                break;
+        case sys_txsto: /* TX! ( c) */
+                putchar((char)top);
+                if (isatty(fileno(stdout)))
+                        fflush(stdout);
+	        pop;
+                break;
+        case sys_toabs: /* >ABS ( a - A) */
+                top = (word_t)(cData + top);
+                break;
+        case sys_torel: /* >REL ( A - a) */
+                top = ((unsigned char *)top - cData);
+                break;
+        case sys_dlsym: /* DLSYM ( A - A|0) */
+                top = (word_t) dlsym(RTLD_DEFAULT, (char *)top);
+                break;
+        case sys_callc: /* (CALL) ( argN ... arg1 N fn -- ret ) */ {
+	        long (*fn)();
+	        int i, narg;
+	        long arg[8];
+	        long ret;
+
+	        fn = (long (*)()) top; pop;
+	        narg = top; pop;
+
+	        for (i = 0; i < narg; i++) {
+		        arg[i] = top; pop;
+	        }
+
+	        switch (narg) {
+	        case 0: ret = (*fn)(); break;
+	        case 1: ret = (*fn)(arg[0]); break;
+	        case 2: ret = (*fn)(arg[0], arg[1]); break;
+	        case 3: ret = (*fn)(arg[0], arg[1], arg[2]); break;
+	        case 4: ret = (*fn)(arg[0], arg[1], arg[2], arg[3]); break;
+	        case 5: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4]); break;
+	        case 6: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]); break;
+	        case 7: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]); break;
+	        default:
+		        break;
+	        }
+
+                push(word_t) ret;
+                } break;
+        default:
+                printf("unknown SYS %X\n", WP);
+        }
 PEND
 PRIMITIVE(next)
         macNEXT;
         NEXT_BYTECODE;
 PEND
-PRIMITIVE(qrx)
-	doNEXT;
-        NEXT_BYTECODE;
-PEND
-PRIMITIVE(txsto)
-	doNEXT;
-        NEXT_BYTECODE;
-PEND
+
 PRIMITIVE(dovar)
         NEXT_BYTECODE;
 	push WP;
@@ -235,13 +300,9 @@ PRIMITIVE(docon)
         NEXT_BYTECODE;
 	push data[TOWORDS(WP)];
 PEND
-PRIMITIVE(douse)
-        NEXT_BYTECODE;
-        push UP + data[TOWORDS(WP)];
-PEND
 PRIMITIVE(dolit)
 	push data[TOWORDS(IP)];
-	IP += BytesPerWord;
+	IP += BPW;
 	doNEXT;
         NEXT_BYTECODE;
 PEND
@@ -258,7 +319,7 @@ PRIMITIVE(exitt)
 PEND
 PRIMITIVE(execu)
 	P = top;
-	WP = P + BytesPerWord;
+	WP = P + BPW;
 	pop;
         NEXT_BYTECODE;
 PEND
@@ -268,7 +329,7 @@ PRIMITIVE(donext)
 		IP = data[TOWORDS(IP)];
 	}
 	else {
-		IP += BytesPerWord;
+		IP += BPW;
 		R--;
 	}
 	doNEXT;
@@ -276,7 +337,7 @@ PRIMITIVE(donext)
 PEND
 PRIMITIVE(qbran)
 	if (top == 0) IP = data[TOWORDS(IP)];
-	else IP += BytesPerWord;
+	else IP += BPW;
 	pop;
 	doNEXT;
         NEXT_BYTECODE;
@@ -453,8 +514,8 @@ PRIMITIVE(ummod)
 	d = (dword_t)((uword_t)top);
 	m = (dword_t)((uword_t)stack[255 & S]);
 	n = (dword_t)((uword_t)stack[255 & (S - 1)]);
-# if BytesPerWord != 8
-	n += m << BitsPerWord;
+# if BPW != 8
+	n += m << (8*BPW);
 # endif
 	pop;
 	top = (uword_t)(n / d);
@@ -465,8 +526,8 @@ PRIMITIVE(msmod)
 	d = (dword_t)((word_t)top);
 	m = (dword_t)((word_t)stack[255 & S]);
 	n = (dword_t)((word_t)stack[255 & (S - 1)]);
-# if BytesPerWord != 8
-	n += m << BitsPerWord;
+# if BPW != 8
+	n += m << (8*BPW);
 # endif
 	pop;
 	top = (word_t)(n / d);
@@ -493,10 +554,10 @@ PRIMITIVE(umsta)
 	d = (udword_t)top;
 	m = (udword_t)stack[255 & S];
 	m *= d;
-# if BytesPerWord == 8
+# if BPW == 8
         top = 0;
 # else
-	top = (uword_t)(m >> BitsPerWord);
+	top = (uword_t)(m >> (8*BPW));
 # endif
 	stack[255 & S] = (uword_t)m;
 PEND
@@ -509,10 +570,10 @@ PRIMITIVE(mstar)
 	d = (dword_t)top;
 	m = (dword_t)stack[255 & S];
 	m *= d;
-# if BytesPerWord == 8
+# if BPW == 8
         top = 0;
 # else
-	top = (word_t)(m >> BitsPerWord);
+	top = (word_t)(m >> (8*BPW));
 # endif
 	stack[255 & (S)] = (word_t)m;
 PEND
@@ -551,8 +612,9 @@ PRIMITIVE(dstor)
 PEND
 PRIMITIVE(dat)
         NEXT_BYTECODE;
-	push data[TOWORDS(top)];
-	top = data[TOWORDS(top) + 1];
+        WP = TOWORDS(top);
+	top = data[WP];
+	push data[WP + 1];
 PEND
 PRIMITIVE(count)
         NEXT_BYTECODE;
@@ -573,55 +635,7 @@ PRIMITIVE(clit)
         push (unsigned char)cData[P++];
         NEXT_BYTECODE;
 PEND
-PRIMITIVE(sys)
-        struct timeval tv;
 
-        NEXT_BYTECODE;
-        WP = top; pop;
-        switch (WP) {
-        case 0: /* ?RX */
-# ifdef _CURTERM_H
-                if (isatty(fileno(stdin))) {
-                        if (has_key()) {
-                                push(word_t) getkey();
-                                kbflush();
-                        } else {
-                                push 0;
-                        }
-                } else {
-                        push(word_t) getchar();
-                }
-# else
-	        push(word_t) getchar();
-# endif
-	        if (top != 0) {
-                        // printf ("?RX => %d\n", top);
-                        push TRUE;
-                }
-                break;
-        case 1: /* TX! */
-# ifdef _CURTERM_H
-                putchar((char)top);
-                if (isatty(fileno(stdout)))
-                        fflush(stdout);
-# else
-	        putchar((char)top);
-# endif
-	        pop;
-                break;
-        case 2: /* MS */
-                usleep(1000 * top);
-                pop;
-                break;
-        case 3: /* COUNTER */
-                gettimeofday (&tv, NULL);
-                tv.tv_usec /= 1000;
-                push(word_t) (tv.tv_sec-t0.tv_sec)*1000+(tv.tv_usec-t0.tv_usec);
-                break;
-        default:
-                printf("unknown SYS %X\n", WP);
-        }
-PEND
 
 # ifdef STC
 #  ifdef GCC_DISPATCH
@@ -635,8 +649,8 @@ PEND
 void(*primitives[as_numbytecodes])(void) = {
 	/* case 0 */ Pnop,
 	/* case 1 */ Pbye,
-	/* case 2 qrx */ Pnop,
-	/* case 3 txsto */ Pnop,
+	/* case 2 */ Psys,
+	/* case 3 */ Pclit,
 	/* case 4 */ Pdocon,
 	/* case 5 */ Pdolit,
 	/* case 6 */ Pdolist,
@@ -696,10 +710,7 @@ void(*primitives[as_numbytecodes])(void) = {
 	/* case 60 */ Pcount,
 	/* case 61 */ Pdovar,
 	/* case 62 */ Pmax,
-	/* case 63 */ Pmin,
-        /* case 64 */ Pclit,
-        /* case 65 */ Psys,
-        /* case 66 */ Pdouse,
+	/* case 63 */ Pmin
 };
 # endif
 
@@ -1027,10 +1038,10 @@ void save (void)
         fwrite (data, sizeof(word_t), size, fout);
 /*
         for (i = 0; i < IP; i++)
-# if BytesPerWord == 8
-                fprintf (fout, "%04X %016llX\n", BytesPerWord * i, data[i]);
+# if BPW == 8
+                fprintf (fout, "%04X %016llX\n", BPW * i, data[i]);
 # else
-                fprintf (fout, "%04X %08X\n", BytesPerWord * i, data[i]);
+                fprintf (fout, "%04X %08X\n", BPW * i, data[i]);
 # endif
 */
         fclose (fout);
@@ -1073,45 +1084,39 @@ int main(int ac, char* av[])
 
 	// Kernel
 
-        // ...status
-
-        HEADER(8, "follower");
-        word_t FOLLOWER = CODE(2, as_douse, as_next); C0MMA( 0*BytesPerWord);
-        HEADER(3, "SP0");
-        word_t SP0 =   CODE(2, as_douse, as_next); C0MMA( 1*BytesPerWord);
 	HEADER(3, "HLD");
-	word_t HLD =   CODE(2, as_douse, as_next); C0MMA( 2*BytesPerWord);
+	word_t HLD =   CODE(2, as_docon, as_next); C0MMA(SYSVARS +  0*BPW);
 	HEADER(4, "SPAN");
-	word_t SPAN =  CODE(2, as_douse, as_next); C0MMA( 3*BytesPerWord);
+	word_t SPAN =  CODE(2, as_docon, as_next); C0MMA(SYSVARS +  1*BPW);
 	HEADER(3, ">IN");
-	word_t INN =   CODE(2, as_douse, as_next); C0MMA( 4*BytesPerWord);
+	word_t INN =   CODE(2, as_docon, as_next); C0MMA(SYSVARS +  2*BPW);
 	HEADER(4, "#TIB");
-	word_t NTIB =  CODE(2, as_douse, as_next); C0MMA( 5*BytesPerWord);
+	word_t NTIB =  CODE(2, as_docon, as_next); C0MMA(SYSVARS +  3*BPW);
 	HEADER(4, "'TIB");
-	word_t TTIB =  CODE(2, as_douse, as_next); C0MMA( 6*BytesPerWord);
+	word_t TTIB =  CODE(2, as_docon, as_next); C0MMA(SYSVARS +  4*BPW);
 	HEADER(4, "BASE");
-	word_t BASE =  CODE(2, as_douse, as_next); C0MMA( 7*BytesPerWord);
+	word_t BASE =  CODE(2, as_docon, as_next); C0MMA(SYSVARS +  5*BPW);
 	HEADER(7, "CONTEXT");
-	word_t CNTXT = CODE(2, as_douse, as_next); C0MMA( 8*BytesPerWord);
+	word_t CNTXT = CODE(2, as_docon, as_next); C0MMA(SYSVARS +  6*BPW);
 	HEADER(2, "CP");
-	word_t CP =    CODE(2, as_douse, as_next); C0MMA( 9*BytesPerWord);
+	word_t CP =    CODE(2, as_docon, as_next); C0MMA(SYSVARS +  7*BPW);
 	HEADER(4, "LAST");
-	word_t LAST =  CODE(2, as_douse, as_next); C0MMA(10*BytesPerWord);
+	word_t LAST =  CODE(2, as_docon, as_next); C0MMA(SYSVARS +  8*BPW);
 	HEADER(5, "'EVAL");
-	word_t TEVAL = CODE(2, as_douse, as_next); C0MMA(11*BytesPerWord);
+	word_t TEVAL = CODE(2, as_docon, as_next); C0MMA(SYSVARS +  9*BPW);
 	HEADER(6, "'ABORT");
-	word_t TABRT = CODE(2, as_douse, as_next); C0MMA(12*BytesPerWord);
+	word_t TABRT = CODE(2, as_docon, as_next); C0MMA(SYSVARS + 10*BPW);
 	HEADER(3, "tmp");
-	word_t TEMP =  CODE(2, as_douse, as_next); C0MMA(13*BytesPerWord);
+	word_t TEMP =  CODE(2, as_docon, as_next); C0MMA(SYSVARS + 11*BPW);
 
 	HEADER(3, "NOP");
 	word_t NOP = CODE(1, as_next);
 	HEADER(3, "BYE");
 	word_t BYE = CODE(2, as_bye, as_next);
 	HEADER(3, "?RX");
-	word_t QRX = CODE(4, as_clit, 0, as_sys, as_next);
+	word_t QRX = CODE(4, as_clit, sys_qrx, as_sys, as_next);
 	HEADER(3, "TX!");
-	word_t TXSTO = CODE(4, as_clit, 1, as_sys, as_next);
+	word_t TXSTO = CODE(4, as_clit, sys_txsto, as_sys, as_next);
 	HEADER(5, "DOCON");
 	word_t DOCON = CODE(2, as_docon, as_next);
 	HEADER(5, "DOLIT");
@@ -1225,25 +1230,21 @@ int main(int ac, char* av[])
 	HEADER(2, "BL");
 	word_t BLANK = CODE(3, as_clit, 32, as_next);
 	HEADER(4, "CELL");
-	word_t CELL = CODE(3, as_clit, BytesPerWord, as_next);
+	word_t CELL = CODE(3, as_clit, BPW, as_next);
 	HEADER(5, "CELL+");
-	word_t CELLP = CODE(4, as_clit, BytesPerWord, as_plus, as_next);
+	word_t CELLP = CODE(4, as_clit, BPW, as_plus, as_next);
 	HEADER(5, "CELL-");
-	word_t CELLM = CODE(4, as_clit, BytesPerWord, as_subb, as_next);
+	word_t CELLM = CODE(4, as_clit, BPW, as_subb, as_next);
 	HEADER(5, "CELLS");
-	word_t CELLS = CODE(4, as_clit, BytesPerWord, as_star, as_next);
+	word_t CELLS = CODE(4, as_clit, BPW, as_star, as_next);
 	HEADER(5, "CELL/");
-	word_t CELLD = CODE(4, as_clit, BytesPerWord, as_slash, as_next);
+	word_t CELLD = CODE(4, as_clit, BPW, as_slash, as_next);
 	HEADER(2, "1+");
 	word_t ONEP = CODE(4, as_clit, 1, as_plus, as_next);
 	HEADER(2, "1-");
 	word_t ONEM = CODE(4, as_clit, 1, as_subb, as_next);
 	HEADER(5, "DOVAR");
 	word_t DOVAR = CODE(2, as_dovar, as_next);
-	HEADER(2, "MS");
-	word_t MSS = CODE(4, as_clit, 2, as_sys, as_next);
-        HEADER(7,"COUNTER");
-        word_t COUNTER = CODE(4, as_clit, 3, as_sys, as_next);
 
 	// Common Colon Words
 
@@ -1262,7 +1263,7 @@ int main(int ac, char* av[])
 	IF(3, DROP, DOLIT, 0X5F);
 	THEN(1, EXITT);
 	HEADER(7, "ALIGNED");
-	word_t ALIGN = COLON(7, DOLIT, (BytesPerWord-1), PLUS, DOLIT, ~((uword_t)(BytesPerWord-1)), ANDD, EXITT);
+	word_t ALIGN = COLON(7, DOLIT, (BPW-1), PLUS, DOLIT, ~((uword_t)(BPW-1)), ANDD, EXITT);
 	HEADER(4, "HERE");
 	word_t HERE = COLON(3, CP, AT, EXITT);
 	HEADER(3, "PAD");
@@ -1347,10 +1348,6 @@ int main(int ac, char* av[])
 
 	// Terminal Output
 
-        HEADER(4, "nuf?");
-        word_t NUFQ = COLON(2, QKEY, DUPP);
-        IF(5, DDROP, KEY, DOLIT, 0XD, EQUAL);
-        THEN(1, EXITT);
 	HEADER(5, "SPACE");
 	word_t SPACE = COLON(3, BLANK, EMIT, EXITT);
 	HEADER(5, "CHARS");
@@ -1409,7 +1406,7 @@ int main(int ac, char* av[])
 	THEN(4, OVER, RFROM, SUBBB, EXITT);
         /* XXX */
 	HEADER(5, "PACK$");
-	word_t PACKS = COLON(18, DUPP, TOR, DDUP, PLUS, DOLIT, ~((uword_t)(BytesPerWord-1)), ANDD, DOLIT, 0, SWAP, STORE, DDUP, CSTOR, ONEP, SWAP, CMOVEE, RFROM, EXITT);
+	word_t PACKS = COLON(18, DUPP, TOR, DDUP, PLUS, DOLIT, ~((uword_t)(BPW-1)), ANDD, DOLIT, 0, SWAP, STORE, DDUP, CSTOR, ONEP, SWAP, CMOVEE, RFROM, EXITT);
 	HEADER(5, "PARSE");
 	word_t PARSE = COLON(15, TOR, TIB, INN, AT, PLUS, NTIB, AT, INN, AT, SUBBB, RFROM, PARS, INN, PSTOR, EXITT);
 	HEADER(5, "TOKEN");
@@ -1545,7 +1542,7 @@ int main(int ac, char* av[])
 	HEADER(1, "]");
 	word_t RBRAC = COLON(5, DOLIT, SCOMP, TEVAL, STORE, EXITT);
 	HEADER(1, ":");
-	word_t COLN = COLON(7, TOKEN, SNAME, RBRAC, DOLIT, 0x6, COMMA, EXITT);
+	word_t COLN = COLON(7, TOKEN, SNAME, RBRAC, DOLIT, MKWORD(as_dolist,as_nop), COMMA, EXITT);
 	HEADER(IMEDD + 1, ";");
 	word_t SEMIS = COLON(6, DOLIT, EXITT, COMMA, LBRAC, OVERT, EXITT);
 
@@ -1554,13 +1551,13 @@ int main(int ac, char* av[])
 	HEADER(3, "dm+");
 	word_t DMP = COLON(4, OVER, DOLIT, 6, UDOTR);
 	FOR(0);
-	AFT(6, DUPP, AT, DOLIT, 1 + BytesPerWord * 2, UDOTR, CELLP);
+	AFT(6, DUPP, AT, DOLIT, 1 + BPW * 2, UDOTR, CELLP);
 	THEN(0);
 	NEXT(1, EXITT);
 	HEADER(4, "DUMP");
 	word_t DUMP = COLON(10, BASE, AT, TOR, HEXX, DOLIT, 0x1F, PLUS, DOLIT, 0x20, SLASH);
 	FOR(0);
-	AFT(10, CR, DOLIT, 32 / BytesPerWord, DDUP, DMP, TOR, SPACE, CELLS, TYPES, RFROM);
+	AFT(10, CR, DOLIT, 32 / BPW, DDUP, DMP, TOR, SPACE, CELLS, TYPES, RFROM);
 	THEN(0);
 	NEXT(5, DROP, RFROM, BASE, STORE, EXITT);
 	HEADER(5, ">NAME");
@@ -1581,15 +1578,6 @@ int main(int ac, char* av[])
 	ELSE(5, CR, DOLIT, 0, TEMP, STORE);
 	THEN(0);
 	REPEAT(1, EXITT);
-        HEADER(3, "SEE");
-        word_t SEE = COLON(3, TICK, CR, CELLP);
-        BEGIN(4, ONEP, DUPP, AT, DUPP);
-        IF(1, TNAME);
-        THEN(1, QDUP);
-        IF(4, SPACE, DOTID, ONEM, CELLP);
-        ELSE(3, DUPP, CAT, UDOT);
-        THEN(4, DOLIT, 100, MSS, NUFQ);
-        UNTIL(2, DROP, EXITT);
 	HEADER(6, "FORGET");
 	word_t FORGT = COLON(3, TOKEN, NAMEQ, QDUP);
 	IF(12, CELLM, DUPP, CP, STORE, AT, DUPP, CNTXT, STORE, LAST, STORE, DROP, EXITT);
@@ -1636,15 +1624,15 @@ int main(int ac, char* av[])
 	HEADER(4, "CODE");
 	word_t CODE = COLON(4, TOKEN, SNAME, OVERT, EXITT);
 	HEADER(6, "CREATE");
-	word_t CREAT = COLON(5, CODE, DOLIT, 0x203D, COMMA, EXITT);
+	word_t CREAT = COLON(6, CODE, DOLIT, MKWORD(as_dovar,as_next), COMMA, EXITT);
 	HEADER(8, "VARIABLE");
 	word_t VARIA = COLON(5, CREAT, DOLIT, 0, COMMA, EXITT);
 	HEADER(8, "CONSTANT");
-	word_t CONST = COLON(6, CODE, DOLIT, 0x2004, COMMA, COMMA, EXITT);
+	word_t CONST = COLON(7, CODE, DOLIT, MKWORD(as_docon,as_next), COMMA, COMMA, EXITT);
 	HEADER(IMEDD + 2, ".(");
 	word_t DOTPR = COLON(5, DOLIT, 0X29, PARSE, TYPES, EXITT);
 	HEADER(IMEDD + 1, "\\");
-	word_t BKSLA = COLON(5, DOLIT, 0xA, WORDD, DROP, EXITT);
+	word_t BKSLA = COLON(5, DOLIT, 0XA, WORDD, DROP, EXITT);
 	HEADER(IMEDD + 1, "(");
 	word_t PAREN = COLON(5, DOLIT, 0X29, PARSE, DDROP, EXITT);
 	HEADER(12, "COMPILE-ONLY");
@@ -1660,7 +1648,7 @@ int main(int ac, char* av[])
         IZ = P;
 	P = 0;
 	word_t RESET = LABEL(2, as_dolist, COLD);
-	P = UBASE + 6 * BytesPerWord;
+	P = SYSVARS + 4 * BPW;
 	word_t USER = LABEL(8, 
                          0x100,                                 // TIB
                          0x10,                                  // BASE
@@ -1687,24 +1675,17 @@ int main(int ac, char* av[])
         load ();
 # endif
 
-        gettimeofday (&t0, NULL);
-        t0.tv_usec /= 1000;
-
 	printf("\nceForth v3.3, 01jul19cht\n");
 
-# ifdef _CURTERM_H
         if (isatty(fileno(stdin))) {
                 prepterm(1);
                 kbflush();
         }
-# endif
 
 # ifdef STC
         stc ();
 # else
         stack = rack - STACK_SIZE;
-        UP    = UBASE;
-        data[TOWORDS(UP)] = TOBYTES(stack - data);
 
 	P = 0;
 	WP = 4;

@@ -39,8 +39,8 @@ CODE R@ ( -n)   rat, END-CODE
 CODE >R ( n)   tor, END-CODE
 CODE DROP ( n)   drop, END-CODE
 CODE DUP ( n - n n)   dup, END-CODE
-CODE SWAP ( n1 n2 - n2 n1)   swap, END-CODE
-CODE OVER ( n1 n2 - n1 n2 n1)   over, END-CODE
+CODE SWAP ( a b - b a)   swap, END-CODE
+CODE OVER ( a b - a b a)   over, END-CODE
 CODE 0< ( n - f)   zless, END-CODE
 CODE AND ( n1 n2 - n3)   andd, END-CODE
 CODE OR ( n1 n2 - n3)   orr, END-CODE
@@ -48,33 +48,33 @@ CODE XOR ( n1 n2 - n3)   xorr, END-CODE
 CODE UM+ ( u1 u2 - ud)   uplus, END-CODE
 CODE NEXT    next, END-CODE
 CODE ?DUP ( n - n n|0)   qdup, END-CODE
-CODE ROT ( n1 n2 n3 - n2 n3 n1)   rot, END-CODE
-CODE 2DROP ( d1 d2)   ddrop, END-CODE
+CODE ROT ( a b c - b c a)   rot, END-CODE
+CODE 2DROP ( d)   ddrop, END-CODE
 CODE 2DUP ( d - d d)   ddup, END-CODE
 CODE + ( n1 n2 - n3)   plus, END-CODE
-CODE NOT ( n1 - n2)   inver, END-CODE
-CODE NEGATE ( n1 - n2)   negat, END-CODE
-CODE DNEGATE ( d1 - d2)   dnega, END-CODE
+CODE NOT ( n - ~n)   inver, END-CODE
+CODE NEGATE ( n - -n)   negat, END-CODE
+CODE DNEGATE ( d - -d)   dnega, END-CODE
 CODE - ( n1 n2 - n3)   subb, END-CODE
 CODE ABS ( n - u)   abss, END-CODE
 CODE = ( n1 n2 - f)   equal, END-CODE
 CODE U< ( u1 u2 - f)   uless, END-CODE
 CODE < ( n1 n2 - f)   less, END-CODE
-CODE UM/MOD ( ud u1 - mod quot)   ummod, END-CODE
-CODE M/MOD ( d n - mod quot)   msmod, END-CODE
-CODE /MOD ( n1 n2 - mod quot)   slmod, END-CODE
+CODE UM/MOD ( ud u1 - mod quo)   ummod, END-CODE
+CODE M/MOD ( d n - mod quo)   msmod, END-CODE
+CODE /MOD ( n1 n2 - mod quo)   slmod, END-CODE
 CODE MOD ( n1 n2 - mod)   mod, END-CODE
 CODE / ( n1 n2 - n3)   slash, END-CODE
 CODE UM* ( u1 u2 - ud)   umsta, END-CODE
 CODE * ( n1 n2 - n3)   star, END-CODE
 CODE M* ( n1 n2 - d)   mstar, END-CODE
-CODE */MOD ( n1 n2 n3 - mod quot)   ssmod, END-CODE
-CODE */ ( n1 n2 n3 - quot)   stasl, END-CODE
+CODE */MOD ( n1 n2 n3 - mod quo)   ssmod, END-CODE
+CODE */ ( n1 n2 n3 - quo)   stasl, END-CODE
 CODE PICK ( n - n1)   pick, END-CODE
 CODE +! ( n a)   pstor, END-CODE
 CODE 2! ( d a)   dstor, END-CODE
 CODE 2@ ( a - d)   dat, END-CODE
-CODE COUNT ( a - a+1 c)   count, END-CODE
+CODE COUNT ( a - a+1 #)   count, END-CODE
 CODE MAX ( n1 n2 - n3)   max, END-CODE
 CODE MIN ( n1 n2 - n3)   min, END-CODE
 
@@ -140,7 +140,6 @@ CODE DOVAR ( - a)   dovar, END-CODE
 
 ( Terminal Output ============================================ )
 
-: nuf? ( - f) ?KEY DUP IF DROP KEY $0D = THEN ;
 : SPACE  BL EMIT ;
 : CHARS  SWAP 0 MAX FOR AFT DUP EMIT THEN NEXT DROP ;
 : SPACES ( n)   BLANK CHARS ;
@@ -246,6 +245,7 @@ CODE DOVAR ( - a)   dovar, END-CODE
 ( Colon Word Compiler ======================================== )
 
 : , ( n)   HERE DUP CELL+ CP ! ! ;
+: LITERAL ( n)   ['] DOLIT , , ; IMMEDIATE
 : ALLOT ( n)   ALIGNED CP +! ;
 : $,"  $22 WORD COUNT + ALIGNED CP ! ;
 : ?UNIQUE ( a - a)
@@ -267,7 +267,7 @@ CODE DOVAR ( - a)   dovar, END-CODE
    IF  LITERAL EXIT  THEN  ERROR ; RECOVER
 : OVERT  LAST @ CONTEXT ! ;
 : ]  ['] $COMPILE 'EVAL ! ;
-: : ( <name>)  TOKEN $,n ] 6 , ;
+: : ( <name>)  TOKEN $,n ] $06 , ; ( dolist, )
 : ;  ['] EXIT , [COMPILE] [ OVERT ; IMMEDIATE
 
 
@@ -285,15 +285,6 @@ CODE DOVAR ( - a)   dovar, END-CODE
       THEN
    REPEAT  SWAP DROP ;
 : .ID ( nfa)   COUNT $1F AND TYPE SPACE ;
-: SEE ( <name>)   ' CR CELL+
-   BEGIN
-      1+ DUP @ DUP
-      IF >NAME THEN
-      ?DUP IF   SPACE .ID 1- CELL+
-           ELSE DUP C@ U.
-           THEN
-      NUF?
-   UNTIL  DROP ;
 : WORDS  CR CONTEXT  0 tmp ! 
    BEGIN  @ ?DUP  WHILE
       DUP SPACE .ID CELL- 
@@ -324,9 +315,9 @@ CODE DOVAR ( - a)   dovar, END-CODE
 : $" ( <text>")   ['] $"| HERE ! $," ; IMMEDIATE
 : ." ( <text>")   ['] ."| HERE ! $," ; IMMEDIATE
 : CODE  TOKEN $,n OVERT ;
-: CREATE ( <name>)   CODE $203D , ; ( BORD)
+: CREATE ( <name>)   CODE $203D , ; ( dovar, )
 : VARIABLE ( <name>)   CREATE 0 , ;
-: CONSTANT ( n <name>)   CODE $2004 , , ; ( BORD)
+: CONSTANT ( n <name>)   CODE $2004 , , ; ( docon, )
 : .( ( <text>)  $29 PARSE TYPE ; IMMEDIATE
 : \  $0A WORD DROP ; IMMEDIATE
 : (  $29 PARSE 2DROP ; IMMEDIATE
