@@ -606,15 +606,16 @@ PRIMITIVE(pstor)
 PEND
 PRIMITIVE(dstor)
         NEXT_BYTECODE;
-	data[TOWORDS(top) + 1] = stack[255 & (S--)];
-	data[TOWORDS(top)] = stack[255 & (S--)];
+        WP = TOWORDS(top); pop;
+	data[WP] = stack[255 & (S--)];
+	data[WP + 1] = stack[255 & (S--)];
 	pop;
 PEND
 PRIMITIVE(dat)
         NEXT_BYTECODE;
         WP = TOWORDS(top);
-	top = data[WP];
-	push data[WP + 1];
+	top = data[WP + 1];
+	push data[WP];
 PEND
 PRIMITIVE(count)
         NEXT_BYTECODE;

@@ -18,17 +18,21 @@ CODE CALLC ( aN ... a1 N fn - ret)   020503 ,
    R> >IN ! ;
 
 : FUNCTION: ( nargs <name>)
-   CRESOLVE : COMPILE doCALLC SWAP , , [COMPILE] ; ;
+   CRESOLVE : COMPILE doCALLC , , [COMPILE] ; ;
 
 
 1 FUNCTION: usleep
 
+DECIMAL
 : MS ( n)   1000 * usleep drop ;
 
 
 2 FUNCTION: gettimeofday
 CREATE tv   2 CELLS ALLOT
 
+HEX
 : TOD ( - usec sec)
    0 tv >ABS gettimeofday drop
-   tv 2@  0ffffffff AND  SWAP ;
+   tv 2@  >R  0ffffffff AND  R> ;
+
+: UNUSED ( - u)   [ 03E80 CELLS ] LITERAL HERE - ;
