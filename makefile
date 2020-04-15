@@ -1,8 +1,13 @@
+# C compiler
 # CC = gcc-mp-8
 CC = cc
+# CC = cc -m32 -mmacosx-version-min=10.6
+
+# Threading
 CFLAGS = -O2 -fomit-frame-pointer
-# CFLAGS = -O2 -fomit-frame-pointer -DSTC
+# CFLAGS = -Os -fomit-frame-pointer -DSTC
 # CFLAGS = -O2 -fomit-frame-pointer -DSTC -DGCC_DISPATCH
+
 SRC = curterm.c ceforth.c
 OBJ = curterm.o ceforth.o
 

@@ -64,7 +64,7 @@ void bye(void)
 void qrx(void)
 {
 	push(int32_t) getchar();
-	if (top != 0) push TRUE;
+	if (top != 0) { push TRUE; }
 }
 void txsto(void)
 {
@@ -357,14 +357,15 @@ void pstor(void)
 }
 void dstor(void)
 {
-	data[(top >> 2) + 1] = stack[(char)S--];
 	data[top >> 2] = stack[(char)S--];
+	data[(top >> 2) + 1] = stack[(char)S--];
 	pop;
 }
 void dat(void)
 {
-	push data[top >> 2];
-	top = data[(top >> 2) + 1];
+        WP = top >> 2;
+	top = data[WP + 1];
+	push data[WP];
 }
 void count(void)
 {
@@ -1320,7 +1321,7 @@ int main(int ac, char* av[])
 	int TNAME = COLON(1, CNTXT);
 	BEGIN(2, AT, DUPP);
 	WHILE(3, DDUP, NAMET, XORR);
-	IF(1, ONEM);
+	IF(1, CELLM);
 	ELSE(3, SWAP, DROP, EXITT);
 	THEN(0);
 	REPEAT(3, SWAP, DROP, EXITT);
