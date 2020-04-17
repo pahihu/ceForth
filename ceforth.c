@@ -698,80 +698,50 @@ word_t CODE(int len, ...) {
 	va_end(argList);
 	return addr;
 }
+
+#define C0MPILEC \
+	va_list argList; \
+	va_start(argList, len); \
+	for (; len; len--) { \
+		word_t j = va_arg(argList, VaType); \
+		data[IP++] = j; \
+		/*printf(" %X",j)*/; \
+	} \
+	P = TOBYTES(IP); \
+	va_end(argList);
+
 word_t COLON(int len, ...) {
 	word_t addr = P;
 	IP = TOWORDS(P);
 	data[IP++] = as_dolist; // dolist
-	va_list argList;
-	va_start(argList, len);
-	//printf(" %X ",6);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 	return addr;
 }
 word_t LABEL(int len, ...) {
 	word_t addr = P;
 	IP = TOWORDS(P);
-	va_list argList;
-	va_start(argList, len);
-	//printf("\n%X ",addr);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 	return addr;
 }
 void BEGIN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X BEGIN ",P);
 	pushR IP;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void AGAIN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X AGAIN ",P);
 	data[IP++] = BRAN;
 	data[IP++] = TOBYTES(I); popR;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void UNTIL(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X UNTIL ",P);
 	data[IP++] = QBRAN;
 	data[IP++] = TOBYTES(I); popR;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void WHILE(int len, ...) {
 	IP = TOWORDS(P);
@@ -782,15 +752,7 @@ void WHILE(int len, ...) {
 	k = I; popR;
 	pushR (IP - 1);
 	pushR k;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void REPEAT(int len, ...) {
 	IP = TOWORDS(P);
@@ -798,15 +760,7 @@ void REPEAT(int len, ...) {
 	data[IP++] = BRAN;
 	data[IP++] = TOBYTES(I); popR;
 	data[I] = TOBYTES(IP); popR;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void IF(int len, ...) {
 	IP = TOWORDS(P);
@@ -814,15 +768,7 @@ void IF(int len, ...) {
 	data[IP++] = QBRAN;
 	pushR IP;
 	data[IP++] = 0;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void ELSE(int len, ...) {
 	IP = TOWORDS(P);
@@ -831,59 +777,27 @@ void ELSE(int len, ...) {
 	data[IP++] = 0;
 	data[I] = TOBYTES(IP); popR;
 	pushR (IP - 1);
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void THEN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X THEN ",P);
 	data[I] = TOBYTES(IP); popR;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void FOR(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X FOR ",P);
 	data[IP++] = TOR;
 	pushR IP;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void NEXT(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X NEXT ",P);
 	data[IP++] = DONXT;
 	data[IP++] = TOBYTES(I); popR;
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
-	P = TOBYTES(IP);
-	va_end(argList);
+        C0MPILEC;
 }
 void AFT(int len, ...) {
 	IP = TOWORDS(P);
@@ -894,60 +808,31 @@ void AFT(int len, ...) {
 	k = I; popR;
 	pushR IP;
 	pushR (IP - 1);
-	va_list argList;
-	va_start(argList, len);
-	for (; len; len--) {
-		word_t j = va_arg(argList, VaType);
-		data[IP++] = j;
-		//printf(" %X",j);
-	}
+        C0MPILEC;
+}
+void CSTRCQ(word_t p, const char seq[]) {
+	IP = TOWORDS(P);
+	int i;
+	int len = strlen(seq);
+	data[IP++] = p;
 	P = TOBYTES(IP);
-	va_end(argList);
+	cData[P++] = len;
+	for (i = 0; i < len; i++)
+	{
+		cData[P++] = seq[i];
+	}
+        CODEALIGN;
+	//printf("\n%X ",P);
+	//printf(seq);
 }
 void DOTQ(const char seq[]) {
-	IP = TOWORDS(P);
-	int i;
-	int len = strlen(seq);
-	data[IP++] = DOTQP;
-	P = TOBYTES(IP);
-	cData[P++] = len;
-	for (i = 0; i < len; i++)
-	{
-		cData[P++] = seq[i];
-	}
-        CODEALIGN;
-	//printf("\n%X ",P);
-	//printf(seq);
+        CSTRCQ(DOTQP, seq);
 }
 void STRQ(const char seq[]) {
-	IP = TOWORDS(P);
-	int i;
-	int len = strlen(seq);
-	data[IP++] = STRQP;
-	P = TOBYTES(IP);
-	cData[P++] = len;
-	for (i = 0; i < len; i++)
-	{
-		cData[P++] = seq[i];
-	}
-        CODEALIGN;
-	//printf("\n%X ",P);
-	//printf(seq);
+        CSTRCQ(STRQP, seq);
 }
 void ABORQ(const char seq[]) {
-	IP = TOWORDS(P);
-	int i;
-	int len = strlen(seq);
-	data[IP++] = ABORQP;
-	P = TOBYTES(IP);
-	cData[P++] = len;
-	for (i = 0; i < len; i++)
-	{
-		cData[P++] = seq[i];
-	}
-        CODEALIGN;
-	//printf("\n%X ",P);
-	//printf(seq);
+        CSTRCQ(ABORQP, seq);
 }
 
 void CheckSum() {
