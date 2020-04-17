@@ -5,7 +5,7 @@ CC = cc
 
 # Threading
 CFLAGS = -O2 -fomit-frame-pointer
-# CFLAGS = -Os -fomit-frame-pointer -DSTC
+# CFLAGS = -O2 -fomit-frame-pointer -DSTC
 # CFLAGS = -O2 -fomit-frame-pointer -DSTC -DGCC_DISPATCH
 
 SRC = curterm.c ceforth.c

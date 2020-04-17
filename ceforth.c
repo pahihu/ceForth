@@ -37,6 +37,7 @@
 # include "curterm.h"
 
 # define BPW 8
+# define CYCLIC_STACK
 
 # if BPW==8
 
@@ -76,42 +77,44 @@ typedef uint32_t udword_t;
 # endif
 
 # if BYTE_ORDER==1234
-#  define MKWORD(c1,c2)   ((c1)+((c2)<<8))
+#  define       MKWORD(c1,c2)   ((c1)+((c2)<<8))
 # else
-#  define MKWORD(c1,c2)   (((c1)<<(8*(BPW-1)))+((c2)<<(8*(BPW-2))))
+#  define       MKWORD(c1,c2)   (((c1)<<(8*(BPW-1)))+((c2)<<(8*(BPW-2))))
 # endif
 
-# define        Round(x)        (((x) + BPW-1) & ~(uword_t)(BPW-1))
+# define        Round(x)   (((x) + BPW-1) & ~(uword_t)(BPW-1))
+
+# define        MEM_SIZE   (16*1024)
+# define        STACK_SIZE 256
+# define        RACK_SIZE  256
+# ifdef CYCLIC_STACK
+#  define       RX(x)      (( RACK_SIZE-1)&(x))
+#  define       SX(x)      ((STACK_SIZE-1)&(x))
+# else
+#  define       RX(x)      (x)
+#  define       SX(x)      (x)
+# endif
 
 # define	FALSE	0
 # define	TRUE	-1
 # define	LOGICAL ? TRUE : FALSE
 # define 	LOWER(x,y) ((uword_t)(x)<(uword_t)(y))
-# define	pop	top = stack[255 & (S--)]
-# define	push	stack[255 & (++S)] = top; top =
-# define	popR    rack[255 & (R--)]
-# define	pushR   rack[255 & (++R)]
+# define	pop	top = stack[SX(S--)]
+# define	push	stack[SX(++S)] = top; top =
+# define	popR    I = rack[RX(R--)]
+# define	pushR   rack[RX(++R)] = I; I =
 
 # define        CODEALIGN   while (P & (BPW-1)) { cData[P++] = 0; }
 # define        SYSVARS     0X80
 
-int p2(void *p1, void *p2)
-{
-        printf ("p1 = %p p2 = %p\n", p1, p2);
-        return 42;
-}
 
-
-# define MEM_SIZE        16000
-# define STACK_SIZE        256
-# define RACK_SIZE         256
 word_t  IZ, thread;
 
 word_t data[MEM_SIZE] = {};
 unsigned char* cData = (unsigned char*)data;
 
 # ifdef STC
-word_t *rack = data + MEM_SIZE - RACK_SIZE;
+word_t I, *rack = data + MEM_SIZE - RACK_SIZE;
 int R = 0;
 word_t  P, IP;
 # endif
@@ -150,7 +153,7 @@ word_t *rack;
 word_t *stack;
 int R = 0;
 int S = 0;
-word_t  top = 0;
+word_t  I = 0, top = 0;
 word_t  P, IP, WP, UP;
 unsigned char bytecode, c;
 
@@ -165,12 +168,12 @@ unsigned char bytecode, c;
 
 # define macNEXT         P = data[TOWORDS(IP)]; WP = P + BPW; IP += BPW;
 # define macDROP         pop
-# define macOVER 	 push stack[255 & (S - 1)];
+# define macOVER 	 push stack[SX(S - 1)];
 # define macINVER	 top = -top - 1;
-# define macTOR          rack[255 & (++R)] = top; pop;
-# define macUPLUS        stack[255 & S] += top; top = LOWER(stack[255 & S], top);
-# define macRFROM        push rack[255 & (R--)];
-# define macPLUS         top += stack[255 & (S--)];
+# define macTOR          pushR top; pop;
+# define macUPLUS        stack[SX(S)] += top; top = LOWER(stack[SX(S)], top);
+# define macRFROM        push I; popR;
+# define macPLUS         top += stack[SX(S--)];
 
 # ifdef STC 
 #  define FETCH_CODE            bytecode = (unsigned char)cData[P++];
@@ -178,14 +181,11 @@ unsigned char bytecode, c;
 #  ifdef GCC_DISPATCH
 #   define PRIMITIVE(x)         L##x: {
 #   ifdef __clang__
-#    define NEXT_BYTECODE
 #    define PEND                FETCH_CODE; goto *dispatch[bytecode]; }
 #   else
-#    define NEXT_BYTECODE       FETCH_CODE
-#    define PEND                goto *dispatch[bytecode]; }
+#    define PEND                FETCH_CODE; goto *dispatch[bytecode]; }
 #   endif
 #  else
-#   define NEXT_BYTECODE
 #   define PRIMITIVE(x)         case as_##x: {
 #   define PEND                 FETCH_CODE; } break;
 #  endif
@@ -193,7 +193,6 @@ unsigned char bytecode, c;
 #  define PRIMITIVE(x)          static void P##x(void) {
 #  define PEND                  }
 #  define doNEXT                Pnext()
-#  define NEXT_BYTECODE
 # endif
 
 // Virtual Forth Machine
@@ -202,6 +201,7 @@ unsigned char bytecode, c;
 	WP = BPW;
 	IP = 0;
 	top = 0;
+        I   = 0;
 
         rack   = data + MEM_SIZE - RACK_SIZE;
         stack  = rack - STACK_SIZE;
@@ -222,7 +222,6 @@ PRIMITIVE(bye)
 	exit(0);
 PEND
 PRIMITIVE(sys)
-        NEXT_BYTECODE;
         WP = top; pop;
         switch (WP) {
         case sys_qrx: /* ?RX ( - c t|0) */
@@ -289,192 +288,154 @@ PRIMITIVE(sys)
 PEND
 PRIMITIVE(next)
         macNEXT;
-        NEXT_BYTECODE;
 PEND
 
 PRIMITIVE(dovar)
-        NEXT_BYTECODE;
 	push WP;
 PEND
 PRIMITIVE(docon)
-        NEXT_BYTECODE;
 	push data[TOWORDS(WP)];
 PEND
 PRIMITIVE(dolit)
 	push data[TOWORDS(IP)];
 	IP += BPW;
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(dolist)
-	rack[255 & (++R)] = IP;
+        pushR IP;
 	IP = WP;
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(exitt)
-	IP = (word_t)rack[255 & (R--)];
+	IP = I; popR;
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(execu)
 	P = top;
 	WP = P + BPW;
 	pop;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(donext)
-	if (rack[255 & R]) {
-		rack[255 & R] -= 1;
+	if (I) {
+		I--;
 		IP = data[TOWORDS(IP)];
 	}
 	else {
 		IP += BPW;
-		R--;
+                popR;
 	}
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(qbran)
 	if (top == 0) IP = data[TOWORDS(IP)];
 	else IP += BPW;
 	pop;
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(bran)
 	IP = data[TOWORDS(IP)];
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(store)
-        NEXT_BYTECODE;
-	data[TOWORDS(top)] = stack[255 & (S--)];
+	data[TOWORDS(top)] = stack[SX(S--)];
 	pop;
 PEND
 PRIMITIVE(at)
-        NEXT_BYTECODE;
 	top = data[TOWORDS(top)];
 PEND
 PRIMITIVE(cstor)
-        NEXT_BYTECODE;
-	cData[top] = (char)stack[255 & (S--)];
+	cData[top] = (char)stack[SX(S--)];
 	pop;
 PEND
 PRIMITIVE(cat)
-        NEXT_BYTECODE;
 	top = (word_t)cData[top];
 PEND
 PRIMITIVE(rpat)
-        NEXT_BYTECODE;
-        push TOBYTES(rack + R - data);
+        WP = rack - data;
+        WP = RACK_SIZE * WP + R;
+        push WP;
 PEND
 PRIMITIVE(rpsto)
-        NEXT_BYTECODE;
         WP = top; pop;
-        WP = TOWORDS(WP);
-        rack = data + (WP & ~(uword_t)0XFF);
-        R    = 0XFF & WP;
+        R  = WP % RACK_SIZE; WP /= RACK_SIZE;
+        rack = data + WP;
 PEND
 PRIMITIVE(rfrom)
-        NEXT_BYTECODE;
         macRFROM;
 PEND
 PRIMITIVE(rat)
-        NEXT_BYTECODE;
-	push rack[255 & R];
+	push I;
 PEND
 PRIMITIVE(tor)
-        NEXT_BYTECODE;
         macTOR;
 PEND
 PRIMITIVE(spat)
-        NEXT_BYTECODE;
-        WP = stack + S - data;
-        push TOBYTES(WP);
+        WP = (stack - data);
+        WP = STACK_SIZE * WP + S;
+        push WP;
 PEND
 PRIMITIVE(spsto)
-        NEXT_BYTECODE;
         WP = top; pop;
-        WP = TOWORDS(WP);
-        stack = data + (WP & ~(uword_t)0XFF);
-        S     = 0XFF & WP;
+        S  = WP % STACK_SIZE; WP /= STACK_SIZE;
+        stack = data + WP;
 PEND
 PRIMITIVE(drop)
-        NEXT_BYTECODE;
         macDROP;
 PEND
 PRIMITIVE(dup)
-        NEXT_BYTECODE;
-	stack[255 & (++S)] = top;
+	stack[SX(++S)] = top;
 PEND
 PRIMITIVE(swap)
-        NEXT_BYTECODE;
 	WP = top;
-	top = stack[255 & S];
-	stack[255 & S] = WP;
+	top = stack[SX(S)];
+	stack[SX(S)] = WP;
 PEND
 PRIMITIVE(over)
-        NEXT_BYTECODE;
         macOVER;
 PEND
 PRIMITIVE(zless)
-        NEXT_BYTECODE;
 	top = (top < 0) LOGICAL;
 PEND
 PRIMITIVE(andd)
-        NEXT_BYTECODE;
-	top &= stack[255 & (S--)];
+	top &= stack[SX(S--)];
 PEND
 PRIMITIVE(orr)
-        NEXT_BYTECODE;
-	top |= stack[255 & (S--)];
+	top |= stack[SX(S--)];
 PEND
 PRIMITIVE(xorr)
-        NEXT_BYTECODE;
-	top ^= stack[255 & (S--)];
+	top ^= stack[SX(S--)];
 PEND
 PRIMITIVE(uplus)
-        NEXT_BYTECODE;
         macUPLUS;
 PEND
 PRIMITIVE(nop)
 	doNEXT;
-        NEXT_BYTECODE;
 PEND
 PRIMITIVE(qdup)
-        NEXT_BYTECODE;
-	if (top) stack[255 & (++S)] = top;
+	if (top) stack[SX(++S)] = top;
 PEND
 PRIMITIVE(rot)
-        NEXT_BYTECODE;
-	WP = stack[255 & (S - 1)];
-	stack[255 & (S - 1)] = stack[255 & S];
-	stack[255 & S] = top;
+	WP = stack[SX(S - 1)];
+	stack[SX(S - 1)] = stack[SX(S)];
+	stack[SX(S)] = top;
 	top = WP;
 PEND
 PRIMITIVE(ddrop)
-        NEXT_BYTECODE;
 	macDROP; macDROP;
 PEND
 PRIMITIVE(ddup)
-        NEXT_BYTECODE;
         macOVER; macOVER;
 PEND
 PRIMITIVE(plus)
-        NEXT_BYTECODE;
         macPLUS;
 PEND
 PRIMITIVE(inver)
-        NEXT_BYTECODE;
         macINVER;
 PEND
 PRIMITIVE(negat)
-        NEXT_BYTECODE;
 	top = 0 - top;
 PEND
 PRIMITIVE(dnega)
-        NEXT_BYTECODE;
         macINVER;
         macTOR;
         macINVER;
@@ -484,157 +445,134 @@ PRIMITIVE(dnega)
 	macPLUS;
 PEND
 PRIMITIVE(subb)
-        NEXT_BYTECODE;
-	top = stack[255 & (S--)] - top;
+	top = stack[SX(S--)] - top;
 PEND
 PRIMITIVE(abss)
-        NEXT_BYTECODE;
 	if (top < 0)
 		top = -top;
 PEND
 /*
 PRIMITIVE(great)
-	top = (stack[255 & (S--)] > top) LOGICAL;
+	top = (stack[SX(S--)] > top) LOGICAL;
 PEND
 */
 PRIMITIVE(less)
-        NEXT_BYTECODE;
-	top = (stack[255 & (S--)] < top) LOGICAL;
+	top = (stack[SX(S--)] < top) LOGICAL;
 PEND
 PRIMITIVE(equal)
-        NEXT_BYTECODE;
-	top = (stack[255 & (S--)] == top) LOGICAL;
+	top = (stack[SX(S--)] == top) LOGICAL;
 PEND
 PRIMITIVE(uless)
-        NEXT_BYTECODE;
-	top = LOWER(stack[255 & S], top) LOGICAL; S--;
+	top = LOWER(stack[SX(S)], top) LOGICAL; S--;
 PEND
 PRIMITIVE(ummod)
-        NEXT_BYTECODE;
 	d = (dword_t)((uword_t)top);
-	m = (dword_t)((uword_t)stack[255 & S]);
-	n = (dword_t)((uword_t)stack[255 & (S - 1)]);
+	m = (dword_t)((uword_t)stack[SX(S)]);
+	n = (dword_t)((uword_t)stack[SX(S - 1)]);
 # if BPW != 8
 	n += m << (8*BPW);
 # endif
 	pop;
 	top = (uword_t)(n / d);
-	stack[255 & S] = (uword_t)(n % d);
+	stack[SX(S)] = (uword_t)(n % d);
 PEND
 PRIMITIVE(msmod)
-        NEXT_BYTECODE;
 	d = (dword_t)((word_t)top);
-	m = (dword_t)((word_t)stack[255 & S]);
-	n = (dword_t)((word_t)stack[255 & (S - 1)]);
+	m = (dword_t)((word_t)stack[SX(S)]);
+	n = (dword_t)((word_t)stack[SX(S - 1)]);
 # if BPW != 8
 	n += m << (8*BPW);
 # endif
 	pop;
 	top = (word_t)(n / d);
-	stack[255 & S] = (word_t)(n % d);
+	stack[SX(S)] = (word_t)(n % d);
 PEND
 PRIMITIVE(slmod)
-        NEXT_BYTECODE;
 	if (top != 0) {
-		WP = stack[255 & S] / top;
-		stack[255 & S] %= top;
+		WP = stack[SX(S)] / top;
+		stack[SX(S)] %= top;
 		top = WP;
 	}
 PEND
 PRIMITIVE(mod)
-        NEXT_BYTECODE;
-	top = (top) ? stack[255 & (S--)] % top : stack[255 & (S--)];
+	top = (top) ? stack[SX(S--)] % top : stack[SX(S--)];
 PEND
 PRIMITIVE(slash)
-        NEXT_BYTECODE;
-	top = (top) ? stack[255 & (S--)] / top : (stack[255 & (S--)], 0);
+	top = (top) ? stack[SX(S--)] / top : (stack[SX(S--)], 0);
 PEND
 PRIMITIVE(umsta)
-        NEXT_BYTECODE;
 	d = (udword_t)top;
-	m = (udword_t)stack[255 & S];
+	m = (udword_t)stack[SX(S)];
 	m *= d;
 # if BPW == 8
         top = 0;
 # else
 	top = (uword_t)(m >> (8*BPW));
 # endif
-	stack[255 & S] = (uword_t)m;
+	stack[SX(S)] = (uword_t)m;
 PEND
 PRIMITIVE(star)
-        NEXT_BYTECODE;
-	top *= stack[255 & (S--)];
+	top *= stack[SX(S--)];
 PEND
 PRIMITIVE(mstar)
-        NEXT_BYTECODE;
 	d = (dword_t)top;
-	m = (dword_t)stack[255 & S];
+	m = (dword_t)stack[SX(S)];
 	m *= d;
 # if BPW == 8
         top = 0;
 # else
 	top = (word_t)(m >> (8*BPW));
 # endif
-	stack[255 & (S)] = (word_t)m;
+	stack[SX(S)] = (word_t)m;
 PEND
 PRIMITIVE(ssmod)
-        NEXT_BYTECODE;
 	d = (dword_t)top;
-	m = (dword_t)stack[255 & S];
-	n = (dword_t)stack[255 & (S - 1)];
+	m = (dword_t)stack[SX(S)];
+	n = (dword_t)stack[SX(S - 1)];
 	n *= m;
 	pop;
 	top = (word_t)(n / d);
-	stack[255 & S] = (word_t)(n % d);
+	stack[SX(S)] = (word_t)(n % d);
 PEND
 PRIMITIVE(stasl)
-        NEXT_BYTECODE;
 	d = (dword_t)top;
-	m = (dword_t)stack[255 & S];
-	n = (dword_t)stack[255 & (S - 1)];
+	m = (dword_t)stack[SX(S)];
+	n = (dword_t)stack[SX(S - 1)];
 	n *= m;
 	pop; pop;
 	top = (word_t)(n / d);
 PEND
 PRIMITIVE(pick)
-        NEXT_BYTECODE;
-	top = stack[255 & (S - top)];
+	top = stack[SX(S - top)];
 PEND
 PRIMITIVE(pstor)
-        NEXT_BYTECODE;
-	data[TOWORDS(top)] += stack[255 & (S--)], pop;
+	data[TOWORDS(top)] += stack[SX(S--)], pop;
 PEND
 PRIMITIVE(dstor)
-        NEXT_BYTECODE;
         top = TOWORDS(top);
-	data[top] = stack[255 & (S--)];
-	data[top + 1] = stack[255 & (S--)];
+	data[top] = stack[SX(S--)];
+	data[top + 1] = stack[SX(S--)];
 	pop;
 PEND
 PRIMITIVE(dat)
-        NEXT_BYTECODE;
         WP = TOWORDS(top);
 	top = data[WP + 1];
 	push data[WP];
 PEND
 PRIMITIVE(count)
-        NEXT_BYTECODE;
-	stack[255 & (++S)] = top + 1;
+	stack[SX(++S)] = top + 1;
 	top = cData[top];
 PEND
 PRIMITIVE(max)
-        NEXT_BYTECODE;
-	if (top < stack[255 & S]) pop;
+	if (top < stack[SX(S)]) pop;
 	else S--;
 PEND
 PRIMITIVE(min)
-        NEXT_BYTECODE;
-	if (top < stack[255 & S]) S--;
+	if (top < stack[SX(S)]) S--;
 	else pop;
 PEND
 PRIMITIVE(clit)
         push (unsigned char)cData[P++];
-        NEXT_BYTECODE;
 PEND
 
 
@@ -794,7 +732,7 @@ word_t LABEL(int len, ...) {
 void BEGIN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X BEGIN ",P);
-	pushR = IP;
+	pushR IP;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -809,7 +747,7 @@ void AGAIN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X AGAIN ",P);
 	data[IP++] = BRAN;
-	data[IP++] = TOBYTES(popR);
+	data[IP++] = TOBYTES(I); popR;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -824,7 +762,7 @@ void UNTIL(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X UNTIL ",P);
 	data[IP++] = QBRAN;
-	data[IP++] = TOBYTES(popR);
+	data[IP++] = TOBYTES(I); popR;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -841,9 +779,9 @@ void WHILE(int len, ...) {
 	//printf("\n%X WHILE ",P);
 	data[IP++] = QBRAN;
 	data[IP++] = 0;
-	k = popR;
-	pushR = (IP - 1);
-	pushR = k;
+	k = I; popR;
+	pushR (IP - 1);
+	pushR k;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -858,8 +796,8 @@ void REPEAT(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X REPEAT ",P);
 	data[IP++] = BRAN;
-	data[IP++] = TOBYTES(popR);
-	data[popR] = TOBYTES(IP);
+	data[IP++] = TOBYTES(I); popR;
+	data[I] = TOBYTES(IP); popR;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -874,7 +812,7 @@ void IF(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X IF ",P);
 	data[IP++] = QBRAN;
-	pushR = IP;
+	pushR IP;
 	data[IP++] = 0;
 	va_list argList;
 	va_start(argList, len);
@@ -891,8 +829,8 @@ void ELSE(int len, ...) {
 	//printf("\n%X ELSE ",P);
 	data[IP++] = BRAN;
 	data[IP++] = 0;
-	data[popR] = TOBYTES(IP);
-	pushR = IP - 1;
+	data[I] = TOBYTES(IP); popR;
+	pushR (IP - 1);
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -906,7 +844,7 @@ void ELSE(int len, ...) {
 void THEN(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X THEN ",P);
-	data[popR] = TOBYTES(IP);
+	data[I] = TOBYTES(IP); popR;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -921,7 +859,7 @@ void FOR(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X FOR ",P);
 	data[IP++] = TOR;
-	pushR = IP;
+	pushR IP;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -936,7 +874,7 @@ void NEXT(int len, ...) {
 	IP = TOWORDS(P);
 	//printf("\n%X NEXT ",P);
 	data[IP++] = DONXT;
-	data[IP++] = TOBYTES(popR);
+	data[IP++] = TOBYTES(I); popR;
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -953,9 +891,9 @@ void AFT(int len, ...) {
 	//printf("\n%X AFT ",P);
 	data[IP++] = BRAN;
 	data[IP++] = 0;
-	k = popR;
-	pushR = IP;
-	pushR = IP - 1;
+	k = I; popR;
+	pushR IP;
+	pushR (IP - 1);
 	va_list argList;
 	va_start(argList, len);
 	for (; len; len--) {
@@ -1080,7 +1018,7 @@ int main(int ac, char* av[])
         rack  = data + MEM_SIZE - RACK_SIZE;
 
 # ifdef BOOT
-        *rack = 0; R = 0;
+        I = 0; *rack = 0; R = 0;
 	P = 512;
 
 	// Kernel
@@ -1645,7 +1583,7 @@ int main(int ac, char* av[])
 
 	// Boot Up
 
-	printf("\n\nIZ=%X R-stack=%X", P, (popR << 2));
+	printf("\n\nIZ=%X R-stack=%X", P, (I << 2)); popR;
         IZ = P;
 	P = 0;
 	word_t RESET = LABEL(2, as_dolist, COLD);
@@ -1694,6 +1632,7 @@ int main(int ac, char* av[])
         *stack = 0; S = 0;
         *rack  = 0; R = 0;
 	top = 0;
+        I   = 0;
 	while (TRUE) {
 		primitives[(unsigned char)cData[P++]]();
 	}

@@ -35,4 +35,4 @@ HEX
    0 tv >ABS gettimeofday drop
    tv 2@  >R  0ffffffff AND  R> ;
 
-: UNUSED ( - u)   [ 03E80 CELLS ] LITERAL HERE - ;
+: UNUSED ( - u)   [ 4000 CELLS ] LITERAL HERE - ;

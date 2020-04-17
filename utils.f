@@ -10,3 +10,5 @@
            THEN
       100 MS  nuf?
    UNTIL  DROP ;
+
+: RECURSE   LAST @ NAME> , ; IMMEDIATE COMPILE-ONLY
