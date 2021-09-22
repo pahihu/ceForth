@@ -855,12 +855,12 @@ void ABORQ(const char seq[]) {
 void CheckSum() {
 	int i;
 	char sum = 0;
-	printf("\n%4X ", P);
+	printf("\n%04X ", P);
 	for (i = 0; i < 16; i++) {
 		sum += cData[P];
-		printf("%2X", cData[P++]);
+		printf("%02X", cData[P++]);
 	}
-	printf(" %2X", sum & 0XFF);
+	printf(" %02X", sum & 0XFF);
 }
 
 /*
@@ -1502,8 +1502,8 @@ int main(int ac, char* av[])
 
 
 	// dump dictionary
-	//P = 0;
-	//for (len = 0; len < 0x200; len++) { CheckSum(); }
+	P = 0;
+	for (int len = 0; len < TOWORDS(IZ) * BPW >> 4; len++) { CheckSum(); }
 
         printf ("\nSaving ceForth v3.3, 01jul19cht\n");
         save ();
