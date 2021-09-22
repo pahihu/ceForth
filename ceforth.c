@@ -32,9 +32,17 @@
 # include <stdarg.h>
 # include <string.h>
 # include <stdint.h>
-# include <unistd.h>
-# include <dlfcn.h>
-# include "curterm.h"
+# ifdef _WIN32
+#  define BYTE_ORDER 1234
+#  define WIN32_LEAN_AND_MEAN 1
+#  include <windows.h>
+# else
+#  include <unistd.h>
+#  include <dlfcn.h>
+# endif
+# ifdef USE_CURTERM
+#  include "curterm.h"
+# endif
 
 # define BPW 8
 # define CYCLIC_STACK
@@ -110,7 +118,7 @@ typedef uint32_t udword_t;
 
 word_t  IZ, thread;
 
-word_t data[MEM_SIZE] = {};
+word_t data[MEM_SIZE] = {0};
 unsigned char* cData = (unsigned char*)data;
 
 # ifdef STC
@@ -257,7 +265,11 @@ PRIMITIVE(sys)
                 top = ((unsigned char *)top - cData);
                 break;
         case sys_dlsym: /* DLSYM ( A - A|0) */
+# ifdef _WIN32
+                top = (word_t) GetProcAddress(GetModuleHandle(NULL), (char *)top);
+# else
                 top = (word_t) dlsym(RTLD_DEFAULT, (char *)top);
+# endif
                 break;
         case sys_callc: /* (CALL) ( argN ... arg1 N fn -- ret ) */ {
 	        long (*fn)();
@@ -860,7 +872,7 @@ void save (void)
         int i;
         uword_t size;
 
-        fout = fopen ("eforth.new", "w");
+        fout = fopen ("eforth.new", "wb");
         size = TOWORDS(IZ);
         printf ("writing eforth.new size = %04X\n", IZ);
         fwrite (&size, sizeof(uword_t), 1, fout);
@@ -886,7 +898,7 @@ void load (void)
         FILE *fin;
         uword_t size;
 
-        fin = fopen ("eforth.img", "r");
+        fin = fopen ("eforth.img", "rb");
         if (fin == NULL) {
                 fprintf (stderr, "eforth.img not found!");
                 exit (1);
@@ -1457,7 +1469,7 @@ int main(int ac, char* av[])
 	HEADER(8, "VARIABLE");
 	word_t VARIA = COLON(5, CREAT, DOLIT, 0, COMMA, EXITT);
 	HEADER(8, "CONSTANT");
-	word_t CONST = COLON(7, CODE, DOLIT, MKWORD(as_docon,as_next), COMMA, COMMA, EXITT);
+	word_t CONSTT = COLON(7, CODE, DOLIT, MKWORD(as_docon,as_next), COMMA, COMMA, EXITT);
 	HEADER(IMEDD + 2, ".(");
 	word_t DOTPR = COLON(5, DOLIT, 0X29, PARSE, TYPES, EXITT);
 	HEADER(IMEDD + 1, "\\");

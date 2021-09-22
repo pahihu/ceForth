@@ -5,9 +5,9 @@ CC = cc
 STRIP = strip
 
 # Threading
-CFLAGS = -O2 -fomit-frame-pointer
-# CFLAGS = -O2 -fomit-frame-pointer -DSTC
-# CFLAGS = -O2 -fomit-frame-pointer -DSTC -DGCC_DISPATCH
+CFLAGS = -O2 -fomit-frame-pointer -DUSE_CURTERM
+# CFLAGS = -O2 -fomit-frame-pointer -DSTC -DUSE_CURTERM
+# CFLAGS = -O2 -fomit-frame-pointer -DSTC -DGCC_DISPATCH -DUSE_CURTERM
 
 SRC = curterm.c ceforth.c
 OBJ = curterm.o ceforth.o
