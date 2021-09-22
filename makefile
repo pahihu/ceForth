@@ -2,6 +2,7 @@
 # CC = gcc-mp-8
 CC = cc
 # CC = cc -m32 -mmacosx-version-min=10.6
+STRIP = strip
 
 # Threading
 CFLAGS = -O2 -fomit-frame-pointer
@@ -24,6 +25,7 @@ ceforth.boot: $(SRC)
 
 ceforth: $(SRC)
 	$(CC) $(CFLAGS) -o $@ $(SRC)
+	$(STRIP) -x -S ceforth
 
 clean:
 	$(RM) eforth.new eforth.img
