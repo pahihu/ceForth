@@ -1503,7 +1503,7 @@ int main(int ac, char* av[])
 
 	// dump dictionary
 	P = 0;
-	for (int len = 0; len < TOWORDS(IZ) * BPW >> 4; len++) { CheckSum(); }
+	for (int len = 0; len < (IZ + 15) >> 4; len++) { CheckSum(); }
 
         printf ("\nSaving ceForth v3.3, 01jul19cht\n");
         save ();
