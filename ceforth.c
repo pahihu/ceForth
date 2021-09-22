@@ -218,13 +218,16 @@ unsigned char bytecode, c;
 # endif
 
 PRIMITIVE(bye)
+# ifdef USE_CURTERM
         prepterm(0);
+# endif
 	exit(0);
 PEND
 PRIMITIVE(sys)
         WP = top; pop;
         switch (WP) {
         case sys_qrx: /* ?RX ( - c t|0) */
+# ifdef USE_CURTERM
                 if (isatty(fileno(stdin))) {
                         if (has_key()) {
                                 push(word_t) getkey();
@@ -232,7 +235,9 @@ PRIMITIVE(sys)
                         } else {
                                 push 0;
                         }
-                } else {
+                } else
+# endif
+                {
                         push(word_t) getchar();
                 }
 	        if (top != 0) {
@@ -1501,10 +1506,12 @@ int main(int ac, char* av[])
 
 	printf("\nceForth v3.3, 01jul19cht\n");
 
+# ifdef USE_CURTERM
         if (isatty(fileno(stdin))) {
                 prepterm(1);
                 kbflush();
         }
+# endif
 
 # ifdef STC
         stc ();
