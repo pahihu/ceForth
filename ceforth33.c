@@ -54,7 +54,11 @@ int32_t  IZ;
 unsigned char bytecode, c;
 
 unsigned char cData[64000] = {
+#ifdef BOOT
+0, 0, 0, 0
+#else
 #include "dict32le.h"
+#endif
 };
 int32_t *data = (int32_t*) cData;
 
@@ -849,8 +853,8 @@ int as_min = 63;
 */
 int main(int ac, char* av[])
 {
-#ifdef BOOT
         data = (int32_t*)cData;
+#ifdef BOOT
 	P = 512;
 	R = 0;
 
