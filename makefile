@@ -1,13 +1,15 @@
 # C compiler
-# CC = gcc-mp-8
-CC = cc
+# CC = gcc-mp-12
+CC = cc -Wno-unused-value
 # CC = cc -m32 -mmacosx-version-min=10.6
 STRIP = strip
 
+# OPT = -O2 -fomit-frame-pointer
+OPT = -O3
 # Threading
-CFLAGS = -O2 -fomit-frame-pointer -DUSE_CURTERM
-# CFLAGS = -O2 -fomit-frame-pointer -DSTC -DUSE_CURTERM
-# CFLAGS = -O2 -fomit-frame-pointer -DSTC -DGCC_DISPATCH -DUSE_CURTERM
+# CFLAGS = $(OPT) -DUSE_CURTERM
+# CFLAGS = $(OPT) -DSTC -DUSE_CURTERM
+CFLAGS = $(OPT) -DSTC -DGCC_DISPATCH -DUSE_CURTERM
 
 SRC = curterm.c ceforth.c
 OBJ = curterm.o ceforth.o

@@ -300,7 +300,7 @@ PRIMITIVE(sys)
                 push(word_t) ret;
                 } break;
         default:
-                printf("unknown SYS %X\n", WP);
+                printf("unknown SYS %llX\n", WP);
         }
 PEND
 PRIMITIVE(next)
@@ -695,7 +695,7 @@ void HEADER(int lex, const char seq[]) {
         CODEALIGN;
 	printf("\n");
 	printf("%s",seq);
-	printf(" %X", P);
+	printf(" %llX", P);
 }
 void C0MMA(word_t j) {
         IP = TOWORDS(P);
@@ -855,7 +855,7 @@ void ABORQ(const char seq[]) {
 void CheckSum() {
 	int i;
 	char sum = 0;
-	printf("\n%04X ", P);
+	printf("\n%04llX ", P);
 	for (i = 0; i < 16; i++) {
 		sum += cData[P];
 		printf("%02X", cData[P++]);
@@ -874,7 +874,7 @@ void save (void)
 
         fout = fopen ("eforth.new", "wb");
         size = TOWORDS(IZ);
-        printf ("writing eforth.new size = %04X\n", IZ);
+        printf ("writing eforth.new size = %04llX\n", IZ);
         fwrite (&size, sizeof(uword_t), 1, fout);
         fwrite (data, sizeof(word_t), size, fout);
 /*
@@ -904,7 +904,7 @@ void load (void)
                 exit (1);
         }
         fread (&size, sizeof(uword_t), 1, fin);
-        printf ("loading eforth.img size = %04X\n", sizeof(word_t) * size);
+        printf ("loading eforth.img size = %04llX\n", sizeof(word_t) * size);
         fread (data, sizeof(word_t), size, fin);
         fclose (fin);
 }
@@ -1485,7 +1485,7 @@ int main(int ac, char* av[])
 
 	// Boot Up
 
-	printf("\n\nIZ=%X R-stack=%X", P, (I << 2)); popR;
+	printf("\n\nIZ=%llX R-stack=%llX", P, (I << 2)); popR;
         IZ = P;
 	P = 0;
 	word_t RESET = LABEL(2, as_dolist, COLD);
