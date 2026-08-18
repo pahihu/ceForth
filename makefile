@@ -1,7 +1,6 @@
 # C compiler
-# CC = gcc-mp-12
+# CC = gcc-16
 CC = cc -Wno-unused-value
-# CC = cc -m32 -mmacosx-version-min=10.6
 STRIP = strip
 
 # OPT = -O2 -fomit-frame-pointer

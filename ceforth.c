@@ -272,12 +272,21 @@ PRIMITIVE(sys)
 # endif
                 break;
         case sys_callc: /* (CALL) ( argN ... arg1 N fn -- ret ) */ {
-	        long (*fn)();
+            long xt;
+            typedef long (*FN0)();
+            typedef long (*FN1)(long);
+            typedef long (*FN2)(long,long);
+            typedef long (*FN3)(long,long,long);
+            typedef long (*FN4)(long,long,long,long);
+            typedef long (*FN5)(long,long,long,long,long);
+            typedef long (*FN6)(long,long,long,long,long,long);
+            typedef long (*FN7)(long,long,long,long,long,long,long);
+            typedef long (*FN8)(long,long,long,long,long,long,long,long);
 	        int i, narg;
 	        long arg[8];
 	        long ret;
 
-	        fn = (long (*)()) top; pop;
+	        xt =  top; pop;
 	        narg = top; pop;
 
 	        for (i = 0; i < narg; i++) {
@@ -285,14 +294,15 @@ PRIMITIVE(sys)
 	        }
 
 	        switch (narg) {
-	        case 0: ret = (*fn)(); break;
-	        case 1: ret = (*fn)(arg[0]); break;
-	        case 2: ret = (*fn)(arg[0], arg[1]); break;
-	        case 3: ret = (*fn)(arg[0], arg[1], arg[2]); break;
-	        case 4: ret = (*fn)(arg[0], arg[1], arg[2], arg[3]); break;
-	        case 5: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4]); break;
-	        case 6: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]); break;
-	        case 7: ret = (*fn)(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]); break;
+	        case 0: ret = (*((FN0)xt))(); break;
+	        case 1: ret = (*((FN1)xt))(arg[0]); break;
+	        case 2: ret = (*((FN2)xt))(arg[0],arg[1]); break;
+	        case 3: ret = (*((FN3)xt))(arg[0],arg[1],arg[2]); break;
+	        case 4: ret = (*((FN4)xt))(arg[0],arg[1],arg[2],arg[3]); break;
+	        case 5: ret = (*((FN5)xt))(arg[0],arg[1],arg[2],arg[3],arg[4]); break;
+	        case 6: ret = (*((FN6)xt))(arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]); break;
+	        case 7: ret = (*((FN7)xt))(arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]); break;
+	        case 8: ret = (*((FN8)xt))(arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7]); break;
 	        default:
 		        break;
 	        }
